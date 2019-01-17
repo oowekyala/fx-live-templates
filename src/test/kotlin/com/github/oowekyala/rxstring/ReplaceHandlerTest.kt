@@ -29,8 +29,7 @@ class ReplaceHandlerTest : FunSpec({
         val extSb = StringBuilder()
 
         val handler = ReplaceHandler { start, end, value -> extSb.replace(start, end, value) }
-        lt.replaceHandler = handler
-        lt.replaceHandler shouldBe handler
+        lt.addReplaceHandler(handler)
         lt.value shouldBe null
 
         val dc = DContext()
@@ -55,12 +54,42 @@ class ReplaceHandlerTest : FunSpec({
         val extSb = StringBuilder()
 
         val handler = ReplaceHandler { start, end, value -> extSb.replace(start, end, value) }
-        lt.replaceHandler = handler
-        lt.replaceHandler shouldBe handler
+        lt.addReplaceHandler(handler)
         lt.value shouldBe null
 
         val dc = DContext()
         lt.dataContext = dc
+        lt.value shouldBe "Foo[MissingOverride]bar"
+        extSb.toString() shouldBe "Foo[MissingOverride]bar"
+
+        dc.name.value = "HELLO"
+
+        lt.value shouldBe "Foo[HELLO]bar"
+        extSb.toString() shouldBe "Foo[HELLO]bar"
+
+    }
+
+    test("A removed handler should not be executed") {
+        class DContext {
+            val name = Var.newSimpleVar("MissingOverride")
+        }
+
+        val lt = LiveTemplate
+                .builder<DContext>()
+                .append("Foo[")
+                .bind { it.name }
+                .append("]bar")
+                .toTemplate()
+
+        val extSb = StringBuilder()
+
+        val handler = ReplaceHandler { start, end, value -> extSb.replace(start, end, value) }
+        lt.addReplaceHandler(handler)
+        lt.value shouldBe null
+
+        val dc = DContext()
+        lt.dataContext = dc
+
         lt.value shouldBe "Foo[MissingOverride]bar"
         extSb.toString() shouldBe "Foo[MissingOverride]bar"
 
@@ -88,8 +117,7 @@ class ReplaceHandlerTest : FunSpec({
         val extSb = StringBuilder()
 
         val handler = ReplaceHandler { start, end, value -> extSb.replace(start, end, value) }
-        lt.replaceHandler = handler
-        lt.replaceHandler shouldBe handler
+        lt.addReplaceHandler(handler)
         lt.value shouldBe null
 
         val dc = DContext()
@@ -136,7 +164,7 @@ class ReplaceHandlerTest : FunSpec({
 
         val events = mutableListOf<ReplaceEvent>()
 
-        lt.setReplaceHandler { start, end, value ->
+        lt.addReplaceHandler { start, end, value ->
             events += ReplaceEvent(start, end, value)
         }
 

@@ -2,6 +2,7 @@ package com.github.oowekyala.rxstring;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -10,21 +11,25 @@ import org.reactfx.value.Var;
 
 
 /**
+ * Implementation for {@link LiveTemplate}. Basically contains logic to switch
+ * the data context and implements {@link Val}. The core logic is in {@link BoundLiveTemplate},
+ * which are spawned by this class when the data context changes.
+ *
  * @author Clément Fournier
  * @since 1.0
  */
 class LiveTemplateImpl<D> implements LiveTemplate<D> {
 
     private final Var<D> myDataContext = Var.newSimpleVar(null);
-    private final Var<ReplaceHandler> myReplaceHandler = Var.newSimpleVar(null);
     private final Var<BoundLiveTemplate<D>> myCurBound = Var.newSimpleVar(null);
     private final Val<String> myDelegateStringVal;
 
-    // That reference is shared with all the bound templates this instance generates
+    // Those are shared with all the bound templates this instance generates
     private final List<ReplaceHandler> myInternalReplaceHandlers = new ArrayList<>();
+    private final List<ReplaceHandler> myUserReplaceHandlers = new ArrayList<>();
 
 
-    public LiveTemplateImpl(Function<D, List<Val<String>>> dataBinder) {
+    LiveTemplateImpl(Function<D, List<Val<String>>> dataBinder) {
 
         myDataContext.values().subscribe(newCtx -> {
 
@@ -34,7 +39,7 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
             }
 
             if (newCtx != null) {
-                myCurBound.setValue(new BoundLiveTemplate<>(newCtx, dataBinder, myReplaceHandler, myInternalReplaceHandlers));
+                myCurBound.setValue(new BoundLiveTemplate<>(newCtx, dataBinder, myUserReplaceHandlers, myInternalReplaceHandlers));
             }
         });
 
@@ -59,32 +64,14 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
 
 
     @Override
-    public void setDataContext(D context) {
-        myDataContext.setValue(context);
+    public void addReplaceHandler(ReplaceHandler handler) {
+        myUserReplaceHandlers.add(Objects.requireNonNull(handler));
     }
 
 
     @Override
-    public D getDataContext() {
-        return myDataContext.getValue();
-    }
-
-
-    @Override
-    public Val<ReplaceHandler> replacementHandler() {
-        return myReplaceHandler;
-    }
-
-
-    @Override
-    public void setReplaceHandler(ReplaceHandler handler) {
-        myReplaceHandler.setValue(handler);
-    }
-
-
-    @Override
-    public ReplaceHandler getReplaceHandler() {
-        return myReplaceHandler.getValue();
+    public void removeReplaceHandler(ReplaceHandler handler) {
+        myUserReplaceHandlers.remove(handler);
     }
 
 

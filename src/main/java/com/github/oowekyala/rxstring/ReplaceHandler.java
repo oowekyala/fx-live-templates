@@ -1,7 +1,7 @@
 package com.github.oowekyala.rxstring;
 
 /**
- * Callback handling text replacement in the external model.
+ * Callback handling text replacement in an external model.
  *
  * @author Clément Fournier
  */
@@ -20,7 +20,7 @@ public interface ReplaceHandler {
 
 
     /**
-     * Inserts a string from the given position.
+     * Inserts a string at the given position.
      *
      * @param start The offset of insertion, inclusive
      * @param value The string to insert

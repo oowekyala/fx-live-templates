@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import org.reactfx.EventSource;
 import org.reactfx.Subscription;
@@ -14,24 +13,25 @@ import org.reactfx.value.ValBase;
 
 
 /**
+ * The actual implementation of a live template, bound to a known data context.
+ *
  * @author Clément Fournier
  * @since 1.0
  */
 class BoundLiveTemplate<D> extends ValBase<String> {
 
-    private static final Logger LOG = Logger.getLogger(LiveTemplate.class.getName());
 
     private final int[] myOffsets;
     private final Subscription myCurCtxSubscription;
     private final StringBuffer myStringBuffer;
     private final EventSource<?> invalidator = new EventSource<>();
-    private final Val<ReplaceHandler> myUserHandler;
+    private final List<ReplaceHandler> myUserHandler;
     private final List<ReplaceHandler> myInternalReplaceHandlers;
 
 
     BoundLiveTemplate(D dataContext,
                       Function<D, List<Val<String>>> dataBinder,
-                      Val<ReplaceHandler> userReplaceHandler,
+                      List<ReplaceHandler> userReplaceHandler,
                       List<ReplaceHandler> internalReplaceHandlers) {
         Objects.requireNonNull(dataContext);
 
@@ -51,7 +51,7 @@ class BoundLiveTemplate<D> extends ValBase<String> {
         this.myUserHandler = userReplaceHandler;
         this.myInternalReplaceHandlers = internalReplaceHandlers;
 
-        myUserHandler.ifPresent(h -> h.insert(0, myStringBuffer.toString()));
+        myUserHandler.forEach(h -> h.insert(0, myStringBuffer.toString()));
     }
 
 
@@ -77,7 +77,7 @@ class BoundLiveTemplate<D> extends ValBase<String> {
         return "BoundLiveTemplate{" +
             "myStringBuffer=" + myStringBuffer +
             ", myOffsets=" + Arrays.toString(myOffsets) +
-            ", myUserHandler=" + myUserHandler.getOpt() +
+            ", myUserHandlers=" + myUserHandler +
             ", myInternalReplaceHandlers=" + myInternalReplaceHandlers +
             '}';
     }
@@ -104,11 +104,14 @@ class BoundLiveTemplate<D> extends ValBase<String> {
 
         invalidator.push(null);
         // call last so that if it fails this object stays in a consistent state
-        try {
-            myUserHandler.ifPresent(h -> h.replace(start, end, value));
-        } catch (Exception e) {
-            LOG.log(Level.SEVERE, e, () -> "An exception was thrown by an external replacement handler");
-        }
+        myUserHandler.forEach(h -> {
+            try {
+                h.replace(start, end, value);
+            } catch (Exception e) {
+                LiveTemplate.LOGGER.log(Level.WARNING, e, () -> "An exception was thrown by an external replacement handler");
+            }
+        });
+
     }
 
 
