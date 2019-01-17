@@ -40,10 +40,40 @@ class ValBehaviorTest : FunSpec({
         lt.value shouldBe "Foo[null]bar"
     }
 
-    test("Test null value handling") {
+
+    test("Test multiple value change propagation") {
         class DContext {
             val name = Var.newSimpleVar("MissingOverride")
             val clazz = Var.newSimpleVar<Class<*>>(FunSpec::class.java)
+        }
+
+        val lt = LiveTemplate
+                .builder<DContext>()
+                .append("Foo[")
+                .bind { it.name }
+                .append("]bar")
+                .toTemplate()
+
+
+        lt.value shouldBe null
+
+        val dc = DContext()
+        lt.dataContext = dc
+
+
+        lt.value shouldBe "Foo[MissingOverride]bar"
+
+        dc.name.value = "hehe"
+
+        lt.value shouldBe "Foo[hehe]bar"
+
+        dc.name.value = null
+        lt.value shouldBe "Foo[null]bar"
+    }
+
+    test("Test null value handling") {
+        class DContext {
+            val name = Var.newSimpleVar("MissingOverride")
         }
 
         val lt = LiveTemplate

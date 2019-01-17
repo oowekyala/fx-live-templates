@@ -63,7 +63,7 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
 
 
     @Override
-    public void setReplacementHandler(ReplaceHandler handler) {
+    public void setReplaceHandler(ReplaceHandler handler) {
         myReplaceHandler.setValue(handler);
     }
 

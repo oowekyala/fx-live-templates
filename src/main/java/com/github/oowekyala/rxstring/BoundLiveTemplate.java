@@ -3,6 +3,8 @@ package com.github.oowekyala.rxstring;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import org.reactfx.EventSource;
 import org.reactfx.Subscription;
@@ -16,12 +18,13 @@ import org.reactfx.value.ValBase;
  */
 class BoundLiveTemplate<D> extends ValBase<String> {
 
+    private static final Logger LOG = Logger.getLogger(LiveTemplate.class.getName());
+
     private final int[] myOffsets;
     private final Subscription myCurCtxSubscription;
     private final StringBuilder myStringBuilder;
     private final EventSource<?> invalidator = new EventSource<>();
-    private final Val<ReplaceHandler> myReplaceHandler;
-
+    private final Val<ReplaceHandler> myUserHandler;
 
 
     BoundLiveTemplate(D dataContext, Function<D, List<Val<String>>> dataBinder, Val<ReplaceHandler> replaceHandler) {
@@ -43,7 +46,9 @@ class BoundLiveTemplate<D> extends ValBase<String> {
         }
 
         this.myCurCtxSubscription = subscription;
-        this.myReplaceHandler = replaceHandler.map(this::wrapUserHandler).orElseConst(myStringBuilder::replace);
+        this.myUserHandler = replaceHandler;
+
+        myUserHandler.ifPresent(h -> h.insert(0, myStringBuilder.toString()));
     }
 
 
@@ -66,45 +71,39 @@ class BoundLiveTemplate<D> extends ValBase<String> {
     // for construction
 
 
-    private String safe(String s) {
-        return Objects.toString(s);
-    }
-
-
-    private ReplaceHandler wrapUserHandler(ReplaceHandler handler) {
-        return (start, end, value) -> {
-            myStringBuilder.replace(start, end, value);
-
-            if (handler != null) {
-                handler.replace(start, end, value);
-            }
-        };
-    }
-
-
     private Subscription initVal(Val<String> source, int idx) {
 
-        String initialValue = safe(source.getValue());
+        String initialValue = Objects.toString(source.getValue());
 
         myOffsets[idx] = myStringBuilder.length();
         myStringBuilder.append(initialValue);
 
-        return source.changes()
+        return source.orElseConst("null") // so that the values in changes are never null
+                     .changes()
                      .subscribe(change -> {
 
-                         String oldVal = safe(change.getOldValue());
-                         String newVal = safe(change.getNewValue());
+                         String oldVal = change.getOldValue();
+                         String newVal = change.getNewValue();
 
-                         myReplaceHandler.getValue().replace(myOffsets[idx], myOffsets[idx] + oldVal.length(), newVal);
+                         int startOffset = myOffsets[idx];
+                         int endOffset = myOffsets[idx] + oldVal.length();
+
+                         myStringBuilder.replace(startOffset, endOffset, newVal);
 
                          int diff = oldVal.length() - newVal.length();
 
+                         // propagate offset changes to the right
                          for (int j = idx + 1; j < myOffsets.length; j++) {
                              myOffsets[j] += diff;
                          }
 
                          invalidator.push(null);
-
+                         // call last so that if it fails this object stays in a consistent state
+                         try {
+                             myUserHandler.ifPresent(h -> h.replace(startOffset, endOffset, newVal));
+                         } catch (Exception e) {
+                             LOG.log(Level.SEVERE, e, () -> "An exception was thrown by an external replacement handler");
+                         }
                      });
     }
 

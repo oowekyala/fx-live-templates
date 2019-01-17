@@ -22,7 +22,7 @@ public interface LiveTemplate<D> extends Val<String> {
     Val<ReplaceHandler> replacementHandler();
 
 
-    void setReplacementHandler(ReplaceHandler handler);
+    void setReplaceHandler(ReplaceHandler handler);
 
 
     ReplaceHandler getReplaceHandler();
