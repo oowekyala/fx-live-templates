@@ -26,7 +26,7 @@ public interface LiveTemplate<D> extends Val<String> {
     /**
      * The object to which this template is bound. If the template
      * is bound to nothing, then its string value ({@link #getValue()})
-     * is null, i.e. this is an empty Val.
+     * is null, i.e. {@link #isEmpty()} returns true.
      *
      * @return The data context property
      */
