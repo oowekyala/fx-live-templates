@@ -112,4 +112,65 @@ class ReplaceHandlerTest : FunSpec({
 
     }
 
+    test("Test nested template minimal change") {
+
+        class SubDContext {
+            val name = Var.newSimpleVar("sub")
+            val num = Var.newSimpleVar(4)
+        }
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+            val sub = Var.newSimpleVar(SubDContext())
+        }
+
+        val lt = LiveTemplate
+                .builder<DContext>()
+                .append("<top name='").bind { it.name }.appendLine("'>")
+                .bindTemplate({ it.sub }) { sub ->
+                    sub.append("<sub name='").bind { it.name }.append("' num='").bind { it.num }.append("'/>")
+                }
+                .endLine()
+                .append("</top>")
+                .toTemplate()
+
+        val events = mutableListOf<ReplaceEvent>()
+
+        lt.setReplaceHandler { start, end, value ->
+            events += ReplaceEvent(start, end, value)
+        }
+
+        lt.value shouldBe null
+
+        val dc = DContext()
+        lt.dataContext = dc
+
+        val afterValue1 = """
+            <top name='top'>
+            <sub name='sub' num='4'/>
+            </top>
+        """.trimIndent()
+
+        lt.value shouldBe afterValue1
+
+        events should haveSize(1)
+        events.last() shouldBe ReplaceEvent(0, 0, afterValue1)
+
+        lt.dataContext.name.value = "foo"
+
+        events should haveSize(2)
+        events.last() shouldBe ReplaceEvent(11, 14, "foo")
+
+        lt.dataContext.sub.value.name.value = "foo"
+
+        events should haveSize(3)
+        events.last() shouldBe ReplaceEvent(28, 31, "foo")
+
+        lt.value shouldBe """
+            <top name='foo'>
+            <sub name='foo' num='4'/>
+            </top>
+        """.trimIndent()
+    }
+
 })

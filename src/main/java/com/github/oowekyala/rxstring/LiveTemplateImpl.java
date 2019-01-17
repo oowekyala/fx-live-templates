@@ -1,5 +1,6 @@
 package com.github.oowekyala.rxstring;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -19,6 +20,9 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
     private final Var<BoundLiveTemplate<D>> myCurBound = Var.newSimpleVar(null);
     private final Val<String> myDelegateStringVal;
 
+    // That reference is shared with all the bound templates this instance generates
+    private final List<ReplaceHandler> myInternalReplaceHandlers = new ArrayList<>();
+
 
     public LiveTemplateImpl(Function<D, List<Val<String>>> dataBinder) {
 
@@ -30,7 +34,7 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
             }
 
             if (newCtx != null) {
-                myCurBound.setValue(new BoundLiveTemplate<>(newCtx, dataBinder, myReplaceHandler));
+                myCurBound.setValue(new BoundLiveTemplate<>(newCtx, dataBinder, myReplaceHandler, myInternalReplaceHandlers));
             }
         });
 
@@ -38,8 +42,18 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
     }
 
 
+    void addInternalReplaceHandler(ReplaceHandler handler) {
+        myInternalReplaceHandlers.add(handler);
+    }
+
+
+    void removeInternalReplaceHandler(ReplaceHandler handler) {
+        myInternalReplaceHandlers.remove(handler);
+    }
+
+
     @Override
-    public Val<D> dataContextProperty() {
+    public Var<D> dataContextProperty() {
         return myDataContext;
     }
 

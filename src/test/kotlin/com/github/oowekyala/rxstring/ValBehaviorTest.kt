@@ -51,7 +51,9 @@ class ValBehaviorTest : FunSpec({
                 .builder<DContext>()
                 .append("Foo[")
                 .bind { it.name }
-                .append("]bar")
+                .append("]bar<")
+                .bind { it.clazz.map { it.simpleName } }
+                .append(">")
                 .toTemplate()
 
 
@@ -61,14 +63,14 @@ class ValBehaviorTest : FunSpec({
         lt.dataContext = dc
 
 
-        lt.value shouldBe "Foo[MissingOverride]bar"
+        lt.value shouldBe "Foo[MissingOverride]bar<FunSpec>"
 
         dc.name.value = "hehe"
 
-        lt.value shouldBe "Foo[hehe]bar"
+        lt.value shouldBe "Foo[hehe]bar<FunSpec>"
 
-        dc.name.value = null
-        lt.value shouldBe "Foo[null]bar"
+        dc.clazz.value = DContext::class.java
+        lt.value shouldBe "Foo[hehe]bar<DContext>"
     }
 
     test("Test null value handling") {
@@ -95,6 +97,59 @@ class ValBehaviorTest : FunSpec({
         lt.value shouldBe "Foo[null]bar"
         dc.name.value = "FOO"
         lt.value shouldBe "Foo[FOO]bar"
+    }
+
+    test("Test nested template") {
+
+        class SubDContext {
+            val name = Var.newSimpleVar("sub")
+            val num = Var.newSimpleVar(4)
+        }
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+            val sub = Var.newSimpleVar(SubDContext())
+        }
+
+        val lt = LiveTemplate
+                .builder<DContext>()
+                .append("<top name='").bind { it.name }.appendLine("'>")
+                .bindTemplate({ it.sub }) { sub ->
+                    sub.append("<sub name='").bind { it.name }.append("' num='").bind { it.num }.append("'/>")
+                }
+                .endLine()
+                .append("</top>")
+                .toTemplate()
+
+
+        lt.value shouldBe null
+
+        val dc = DContext()
+        lt.dataContext = dc
+
+        lt.value shouldBe """
+            <top name='top'>
+            <sub name='sub' num='4'/>
+            </top>
+        """.trimIndent()
+
+        lt.dataContext.name.value = "foo"
+
+
+        lt.value shouldBe """
+            <top name='foo'>
+            <sub name='sub' num='4'/>
+            </top>
+        """.trimIndent()
+
+        lt.dataContext.sub.value.name.value = "foo"
+
+
+        lt.value shouldBe """
+            <top name='foo'>
+            <sub name='foo' num='4'/>
+            </top>
+        """.trimIndent()
     }
 
     test("Test initial null value") {

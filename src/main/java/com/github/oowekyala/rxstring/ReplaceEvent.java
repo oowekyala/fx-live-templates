@@ -1,43 +1,81 @@
 package com.github.oowekyala.rxstring;
 
+import java.util.Objects;
+
+
 /**
- * Callback handling text replacement in the external model.
+ * Object describing a replacement that has occurred inside a live template
+ * because of a change in a bound value.
  *
  * @author Clément Fournier
  */
-@FunctionalInterface
-public interface ReplaceEvent {
+final class ReplaceEvent {
+
+    private final int startIndex;
+    private final int endIndex;
+    private final String value;
 
 
-    /**
-     * Replaces some text in the external model.
-     *
-     * @param start Start of the replaced range, inclusive
-     * @param end   End of the replaced range, exclusive
-     * @param value Replacement value
-     */
-    void replace(int start, int end, String value);
-
-
-    /**
-     * Inserts a string from the given position.
-     *
-     * @param start The offset of insertion, inclusive
-     * @param value The string to insert
-     */
-    default void insert(int start, String value) {
-        replace(start, start, value);
+    public ReplaceEvent(int startIndex, int endIndex, String value) {
+        this.startIndex = startIndex;
+        this.endIndex = endIndex;
+        this.value = value;
     }
 
 
-    /**
-     * Deletes the text at a specified range.
-     *
-     * @param start Start of the deleted range, inclusive
-     * @param end   End of the deleted range, exclusive
-     */
-    default void delete(int start, int end) {
-        replace(start, end, "");
+    public int getStartIndex() {
+        return startIndex;
     }
 
+
+    public int getEndIndex() {
+        return endIndex;
+    }
+
+
+    public String getValue() {
+        return value;
+    }
+
+
+    public int component1() {
+        return getStartIndex();
+    }
+
+
+    public int component2() {
+        return getEndIndex();
+    }
+
+
+    public String component3() {
+        return getValue();
+    }
+
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ReplaceEvent that = (ReplaceEvent) o;
+        return startIndex == that.startIndex &&
+            endIndex == that.endIndex &&
+            Objects.equals(value, that.value);
+    }
+
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(startIndex, endIndex, value);
+    }
+
+
+    @Override
+    public String toString() {
+        return "ReplaceEvent(" + startIndex + ", " + endIndex + ", '" + value + '\'' + ')';
+    }
 }

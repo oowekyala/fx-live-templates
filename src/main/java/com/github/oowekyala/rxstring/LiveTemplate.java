@@ -1,6 +1,7 @@
 package com.github.oowekyala.rxstring;
 
 import org.reactfx.value.Val;
+import org.reactfx.value.Var;
 
 
 /**
@@ -10,7 +11,7 @@ import org.reactfx.value.Val;
 public interface LiveTemplate<D> extends Val<String> {
 
 
-    Val<D> dataContextProperty();
+    Var<D> dataContextProperty();
 
 
     void setDataContext(D context);
@@ -31,4 +32,5 @@ public interface LiveTemplate<D> extends Val<String> {
     static <D> LiveTemplateBuilder<D> builder() {
         return new LiveTemplateBuilder<>();
     }
+
 }

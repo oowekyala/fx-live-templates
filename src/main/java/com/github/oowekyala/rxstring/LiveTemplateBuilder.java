@@ -3,6 +3,7 @@ package com.github.oowekyala.rxstring;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -36,14 +37,35 @@ public class LiveTemplateBuilder<D> {
     }
 
 
-    public LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<String>> binder) {
-        myBindings.add(binder.andThen(Val::wrap));
+    public LiveTemplateBuilder<D> endLine() {
+        return appendLine("");
+    }
+
+
+    public LiveTemplateBuilder<D> appendLine(String s) {
+        return append(s + "\n");
+    }
+
+
+    public LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<?>> binder) {
+        myBindings.add(binder.andThen(Val::wrap).andThen(val -> val.map(Object::toString)));
         return this;
     }
 
 
-    public LiveTemplateBuilder<D> bindTemplate(Function<? super D, LiveTemplate<?>> binder) {
-        myBindings.add(binder);
+    public <T> LiveTemplateBuilder<D> bindTemplate(Function<? super D, ? extends ObservableValue<T>> extractor,
+                                                   Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
+
+        Function<ObservableValue<T>, LiveTemplate<T>> templateMaker = obsT -> {
+            LiveTemplateBuilder<T> builder = LiveTemplate.builder();
+            subTemplateBuilder.accept(builder);
+            LiveTemplate<T> template = builder.toTemplate();
+            template.dataContextProperty().bind(obsT);
+            return template;
+        };
+
+        // it's important that the binder return a LiveTemplate, otherwise the minimal changes are not detected
+        myBindings.add(extractor.andThen(templateMaker));
         return this;
     }
 
