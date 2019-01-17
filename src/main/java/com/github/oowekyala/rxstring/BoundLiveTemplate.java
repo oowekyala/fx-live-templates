@@ -51,7 +51,7 @@ class BoundLiveTemplate<D> extends ValBase<String> {
         this.myUserHandler = userReplaceHandler;
         this.myInternalReplaceHandlers = internalReplaceHandlers;
 
-        myUserHandler.forEach(h -> h.insert(0, myStringBuffer.toString()));
+        myUserHandler.forEach(h -> safeHandlerCall(h, 0, 0, myStringBuffer.toString()));
     }
 
 
@@ -103,14 +103,7 @@ class BoundLiveTemplate<D> extends ValBase<String> {
         propagateOffsetChange(childIdx, value.length() - (end - start));
 
         invalidator.push(null);
-        // call last so that if it fails this object stays in a consistent state
-        myUserHandler.forEach(h -> {
-            try {
-                h.replace(start, end, value);
-            } catch (Exception e) {
-                LiveTemplate.LOGGER.log(Level.WARNING, e, () -> "An exception was thrown by an external replacement handler");
-            }
-        });
+        myUserHandler.forEach(h -> safeHandlerCall(h, start, end, value));
 
     }
 
@@ -148,6 +141,15 @@ class BoundLiveTemplate<D> extends ValBase<String> {
 
                          handleContentChange(idx, startOffset, endOffset, change.getNewValue());
                      });
+    }
+
+
+    private static void safeHandlerCall(ReplaceHandler h, int start, int end, String value) {
+        try {
+            h.replace(start, end, value);
+        } catch (Exception e) {
+            LiveTemplate.LOGGER.log(Level.WARNING, e, () -> "An exception was thrown by an external replacement handler");
+        }
     }
 
 

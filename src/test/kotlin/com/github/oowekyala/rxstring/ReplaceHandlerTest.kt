@@ -93,10 +93,11 @@ class ReplaceHandlerTest : FunSpec({
         lt.value shouldBe "Foo[MissingOverride]bar"
         extSb.toString() shouldBe "Foo[MissingOverride]bar"
 
+        lt.removeReplaceHandler(handler)
         dc.name.value = "HELLO"
 
         lt.value shouldBe "Foo[HELLO]bar"
-        extSb.toString() shouldBe "Foo[HELLO]bar"
+        extSb.toString() shouldBe "Foo[MissingOverride]bar"
 
     }
 
@@ -125,12 +126,12 @@ class ReplaceHandlerTest : FunSpec({
         lt.value shouldBe "Foo[MissingOverride]bar"
         extSb.toString() shouldBe "Foo[MissingOverride]bar"
 
-        extSb.clear()
+        extSb.clear() // Now extSb isn't long enough and will throw StringIndexOutOfBoundsException on replace
 
         val testLogHandler = TestLogHandler()
         Logger.getLogger(LiveTemplate::class.java.name).addHandler(testLogHandler)
 
-        dc.name.value = "HELLO" // catches a StringIndexOutOfBoundsException
+        dc.name.value = "HELLO"
 
         testLogHandler.log should haveSize(1)
         testLogHandler.log[0].thrown should beOfType<StringIndexOutOfBoundsException>()
@@ -138,6 +139,42 @@ class ReplaceHandlerTest : FunSpec({
         // the value stayed consistent
         lt.value shouldBe "Foo[HELLO]bar"
 
+    }
+
+
+    test("Exceptions in a handler should not prevent other handlers from executing") {
+        class DContext {
+            val name = Var.newSimpleVar("MissingOverride")
+        }
+
+        val lt = LiveTemplate
+                .builder<DContext>()
+                .append("Foo[")
+                .bind { it.name }
+                .append("]bar")
+                .toTemplate()
+
+        val extSb = StringBuilder()
+
+        lt.addReplaceHandler { start, end, value -> extSb.replace(start, end, value) }
+        lt.addReplaceHandler { _, _, _ -> throw IllegalStateException() }
+        lt.value shouldBe null
+
+        val dc = DContext()
+        lt.dataContext = dc
+        lt.value shouldBe "Foo[MissingOverride]bar"
+        extSb.toString() shouldBe "Foo[MissingOverride]bar"
+
+        val testLogHandler = TestLogHandler()
+        Logger.getLogger(LiveTemplate::class.java.name).addHandler(testLogHandler)
+
+        dc.name.value = "HELLO"
+
+        testLogHandler.log should haveSize(1)
+        testLogHandler.log[0].thrown should beOfType<IllegalStateException>()
+
+        lt.value shouldBe "Foo[HELLO]bar"
+        extSb.toString() shouldBe "Foo[HELLO]bar" // this one got executed
     }
 
     test("Test nested template minimal change") {
