@@ -5,12 +5,15 @@ import java.util.Objects;
 import java.util.function.Function;
 
 import org.reactfx.EventSource;
+import org.reactfx.EventStream;
 import org.reactfx.Subscription;
 import org.reactfx.value.Val;
 import org.reactfx.value.ValBase;
 
 
 /**
+ * Template bound to a data context.
+ *
  * @author Clément Fournier
  * @since 1.0
  */
@@ -19,12 +22,10 @@ class BoundLiveTemplate<D> extends ValBase<String> {
     private final int[] myOffsets;
     private final Subscription myCurCtxSubscription;
     private final StringBuilder myStringBuilder;
-    private final EventSource<?> invalidator = new EventSource<>();
-    private final Val<ReplaceHandler> myReplaceHandler;
+    private final EventSource<ReplaceEvent> myReplaceEvents = new EventSource<>();
 
 
-
-    BoundLiveTemplate(D dataContext, Function<D, List<Val<String>>> dataBinder, Val<ReplaceHandler> replaceHandler) {
+    BoundLiveTemplate(D dataContext, Function<D, List<Val<String>>> dataBinder) {
         Objects.requireNonNull(dataContext);
 
         List<Val<String>> unsubscribedVals = Objects.requireNonNull(dataBinder.apply(dataContext));
@@ -43,7 +44,6 @@ class BoundLiveTemplate<D> extends ValBase<String> {
         }
 
         this.myCurCtxSubscription = subscription;
-        this.myReplaceHandler = replaceHandler.map(this::wrapUserHandler).orElseConst(myStringBuilder::replace);
     }
 
 
@@ -52,9 +52,14 @@ class BoundLiveTemplate<D> extends ValBase<String> {
     }
 
 
+    EventStream<ReplaceEvent> replaceEvents() {
+        return myReplaceEvents;
+    }
+
+
     @Override
     protected Subscription connect() {
-        return invalidator.subscribe(any -> invalidate());
+        return myReplaceEvents.subscribe(any -> invalidate());
     }
 
 
@@ -70,18 +75,6 @@ class BoundLiveTemplate<D> extends ValBase<String> {
         return Objects.toString(s);
     }
 
-
-    private ReplaceHandler wrapUserHandler(ReplaceHandler handler) {
-        return (start, end, value) -> {
-            myStringBuilder.replace(start, end, value);
-
-            if (handler != null) {
-                handler.replace(start, end, value);
-            }
-        };
-    }
-
-
     private Subscription initVal(Val<String> source, int idx) {
 
         String initialValue = safe(source.getValue());
@@ -95,7 +88,9 @@ class BoundLiveTemplate<D> extends ValBase<String> {
                          String oldVal = safe(change.getOldValue());
                          String newVal = safe(change.getNewValue());
 
-                         myReplaceHandler.getValue().replace(myOffsets[idx], myOffsets[idx] + oldVal.length(), newVal);
+                         ReplaceEvent event = new ReplaceEvent(myOffsets[idx], myOffsets[idx] + oldVal.length(), newVal);
+
+                         myStringBuilder.replace(event.getStartIndex(), event.getEndIndex(), event.getValue());
 
                          int diff = oldVal.length() - newVal.length();
 
@@ -103,7 +98,7 @@ class BoundLiveTemplate<D> extends ValBase<String> {
                              myOffsets[j] += diff;
                          }
 
-                         invalidator.push(null);
+                         myReplaceEvents.push(event);
 
                      });
     }

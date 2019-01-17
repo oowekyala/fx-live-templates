@@ -1,5 +1,6 @@
 package com.github.oowekyala.rxstring;
 
+import org.reactfx.EventStream;
 import org.reactfx.value.Val;
 
 
@@ -19,13 +20,7 @@ public interface LiveTemplate<D> extends Val<String> {
     D getDataContext();
 
 
-    Val<ReplaceHandler> replacementHandler();
-
-
-    void setReplacementHandler(ReplaceHandler handler);
-
-
-    ReplaceHandler getReplaceHandler();
+    EventStream<ReplaceEvent> replaceEvents();
 
 
     static <D> LiveTemplateBuilder<D> builder() {
