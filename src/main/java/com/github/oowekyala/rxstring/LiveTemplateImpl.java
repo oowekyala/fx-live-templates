@@ -4,8 +4,6 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import org.reactfx.EventSource;
-import org.reactfx.EventStream;
 import org.reactfx.value.Val;
 import org.reactfx.value.Var;
 
@@ -17,9 +15,9 @@ import org.reactfx.value.Var;
 class LiveTemplateImpl<D> implements LiveTemplate<D> {
 
     private final Var<D> myDataContext = Var.newSimpleVar(null);
+    private final Var<ReplaceHandler> myReplaceHandler = Var.newSimpleVar(null);
     private final Var<BoundLiveTemplate<D>> myCurBound = Var.newSimpleVar(null);
     private final Val<String> myDelegateStringVal;
-    private final EventStream<ReplaceEvent> myReplaceEvents;
 
 
     public LiveTemplateImpl(Function<D, List<Val<String>>> dataBinder) {
@@ -32,15 +30,11 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
             }
 
             if (newCtx != null) {
-                myCurBound.setValue(new BoundLiveTemplate<>(newCtx, dataBinder));
+                myCurBound.setValue(new BoundLiveTemplate<>(newCtx, dataBinder, myReplaceHandler));
             }
         });
 
         myDelegateStringVal = myCurBound.flatMap(Function.identity());
-        myReplaceEvents = myCurBound.map(BoundLiveTemplate::replaceEvents)
-                                    .orElseConst(new EventSource<>())  // empty stream
-                                    .values()
-                                    .flatMap(Function.identity());
     }
 
 
@@ -63,8 +57,20 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
 
 
     @Override
-    public EventStream<ReplaceEvent> replaceEvents() {
-        return myReplaceEvents;
+    public Val<ReplaceHandler> replacementHandler() {
+        return myReplaceHandler;
+    }
+
+
+    @Override
+    public void setReplacementHandler(ReplaceHandler handler) {
+        myReplaceHandler.setValue(handler);
+    }
+
+
+    @Override
+    public ReplaceHandler getReplaceHandler() {
+        return myReplaceHandler.getValue();
     }
 
 

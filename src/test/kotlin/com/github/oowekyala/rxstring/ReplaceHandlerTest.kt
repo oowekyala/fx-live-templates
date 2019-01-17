@@ -3,6 +3,7 @@ package com.github.oowekyala.rxstring
 import io.kotlintest.shouldBe
 import io.kotlintest.specs.FunSpec
 import org.reactfx.value.Var
+import java.lang.StringBuilder
 
 /**
  * @author Clément Fournier
@@ -23,11 +24,9 @@ class ReplaceHandlerTest : FunSpec({
                 .append("]bar")
                 .toTemplate()
 
-        // has ok length
-        val extSb = StringBuilder("fooooooooooooooooo")
+        val extSb = StringBuilder("foooo")
 
-
-
+        lt.replaceHandler =
         lt.value shouldBe null
 
         val dc = DContext()
@@ -62,7 +61,6 @@ class ReplaceHandlerTest : FunSpec({
 
         val dc = DContext()
         lt.dataContext = dc
-        lt.dataContext shouldBe dc
 
         lt.value shouldBe "Foo[MissingOverride]bar"
 
