@@ -29,7 +29,7 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
     private final List<ReplaceHandler> myUserReplaceHandlers = new ArrayList<>();
 
 
-    LiveTemplateImpl(Function<D, List<Val<String>>> dataBinder) {
+    LiveTemplateImpl(List<BindingExtractor<D, ?>> dataBinder) {
 
         myDataContext.values().subscribe(newCtx -> {
 

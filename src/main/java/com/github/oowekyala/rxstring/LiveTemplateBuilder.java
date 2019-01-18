@@ -1,5 +1,6 @@
 package com.github.oowekyala.rxstring;
 
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -60,7 +61,9 @@ public interface LiveTemplateBuilder<D> {
      *
      * @see #bind(Function, Function)
      */
-    <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<T>> extractor);
+    default <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<T>> extractor) {
+        return bind(extractor, Objects::toString);
+    }
 
 
     /**

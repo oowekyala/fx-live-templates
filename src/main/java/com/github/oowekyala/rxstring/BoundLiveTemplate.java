@@ -1,15 +1,19 @@
 package com.github.oowekyala.rxstring;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Function;
 import java.util.logging.Level;
 
 import org.reactfx.EventSource;
 import org.reactfx.Subscription;
+import org.reactfx.collection.LiveList;
 import org.reactfx.value.Val;
 import org.reactfx.value.ValBase;
+
+import com.github.oowekyala.rxstring.BindingExtractor.SeqBinding;
 
 
 /**
@@ -20,8 +24,13 @@ import org.reactfx.value.ValBase;
  */
 class BoundLiveTemplate<D> extends ValBase<String> {
 
+    // Represents the offsets of each outer binding
+    private final int[] myOuterOffsets;
+    // Represents the offsets associated with each component of a list binding
+    // the offsets in inner arrays are relative to the offset of their outer array (in myOuterOffsets)
+    private final List<List<Integer>> mySequenceOffsets;
+    private final List<List<Subscription>> mySequenceSubs;
 
-    private final int[] myOffsets;
     private final Subscription myCurCtxSubscription;
     private final StringBuffer myStringBuffer;
     private final EventSource<?> invalidator = new EventSource<>();
@@ -30,20 +39,23 @@ class BoundLiveTemplate<D> extends ValBase<String> {
 
 
     BoundLiveTemplate(D dataContext,
-                      Function<D, List<Val<String>>> dataBinder,
+                      List<BindingExtractor<D, ?>> bindings,
                       List<ReplaceHandler> userReplaceHandler,
                       List<ReplaceHandler> internalReplaceHandlers) {
         Objects.requireNonNull(dataContext);
 
-        List<Val<String>> unsubscribedVals = Objects.requireNonNull(dataBinder.apply(dataContext));
-        this.myOffsets = new int[unsubscribedVals.size()];
+        // the size of these is absolutely constant
+        this.myOuterOffsets = new int[bindings.size()];
+        this.mySequenceOffsets = new ArrayList<>(Collections.nCopies(bindings.size(), null));
+        this.mySequenceSubs = new ArrayList<>(Collections.nCopies(bindings.size(), null));
+
         this.myStringBuffer = new StringBuffer();
 
         Subscription subscription = () -> {};
 
-        for (int i = 0; i < myOffsets.length; i++) {
+        for (int i = 0; i < myOuterOffsets.length; i++) {
             subscription = subscription.and(
-                initVal(unsubscribedVals.get(i), i)
+                initBinding(dataContext, bindings.get(i), i)
             );
         }
 
@@ -52,6 +64,17 @@ class BoundLiveTemplate<D> extends ValBase<String> {
         this.myInternalReplaceHandlers = internalReplaceHandlers;
 
         myUserHandler.forEach(h -> safeHandlerCall(h, 0, 0, myStringBuffer.toString()));
+    }
+
+
+    @Override
+    public String toString() {
+        return "BoundLiveTemplate{" +
+            "myStringBuffer=" + myStringBuffer +
+            ", myOuterOffsets=" + Arrays.toString(myOuterOffsets) +
+            ", myUserHandlers=" + myUserHandler +
+            ", myInternalReplaceHandlers=" + myInternalReplaceHandlers +
+            '}';
     }
 
 
@@ -70,37 +93,36 @@ class BoundLiveTemplate<D> extends ValBase<String> {
     protected String computeValue() {
         return myStringBuffer.toString();
     }
-
-
-    @Override
-    public String toString() {
-        return "BoundLiveTemplate{" +
-            "myStringBuffer=" + myStringBuffer +
-            ", myOffsets=" + Arrays.toString(myOffsets) +
-            ", myUserHandlers=" + myUserHandler +
-            ", myInternalReplaceHandlers=" + myInternalReplaceHandlers +
-            '}';
-    }
     // for construction
 
 
-    private void propagateOffsetChange(int from, int diff) {
+    private void propagateOffsetChange(int outerIdx, int innerIdx, int diff) {
         if (diff == 0) {
             return;
         }
-        for (int j = from + 1; j < myOffsets.length; j++) {
-            myOffsets[j] += diff;
+
+        List<Integer> inner = mySequenceOffsets.get(outerIdx);
+
+        // the relative change is propagated to all elements right of this one in the inner table
+        for (int j = innerIdx + 1; j < inner.size(); j++) {
+            inner.set(j, inner.get(j) + diff);
+        }
+
+        // and to all outer indices right of this one
+        // the inner indices of the other sequences need not be touched
+        for (int j = outerIdx + 1; j < myOuterOffsets.length; j++) {
+            myOuterOffsets[j] += diff;
         }
     }
 
 
-    private void handleContentChange(int childIdx, int start, int end, String value) {
+    private void handleContentChange(int outerIdx, int innerIdx, int start, int end, String value) {
         myStringBuffer.replace(start, end, value);
 
         // propagate the change to the templates that contain this one
         myInternalReplaceHandlers.forEach(h -> h.replace(start, end, value));
 
-        propagateOffsetChange(childIdx, value.length() - (end - start));
+        propagateOffsetChange(outerIdx, innerIdx, value.length() - (end - start));
 
         invalidator.push(null);
         myUserHandler.forEach(h -> safeHandlerCall(h, start, end, value));
@@ -108,39 +130,76 @@ class BoundLiveTemplate<D> extends ValBase<String> {
     }
 
 
-    private Subscription initVal(Val<String> source, int idx) {
+    @SuppressWarnings("unchecked")
+    private Subscription initBinding(D context, BindingExtractor<D, ?> bindingExtractor, int outerIdx) {
+        myOuterOffsets[outerIdx] = myStringBuffer.length();
+
+        if (bindingExtractor instanceof BindingExtractor.ValExtractor
+            || bindingExtractor instanceof BindingExtractor.TemplateBinding) {
+            mySequenceOffsets.set(outerIdx, Collections.singletonList(0));
+            return initVal((Val<String>) bindingExtractor.apply(context), outerIdx, 0);
+        } else if (bindingExtractor instanceof BindingExtractor.SeqBinding) {
+            return initSeqBinding(context, (SeqBinding<D, ?>) bindingExtractor, outerIdx);
+        }
+
+        throw new IllegalStateException("Unhandled binding extractor of " + bindingExtractor.getClass());
+
+    }
+
+
+    private <T> Subscription initSeqBinding(D ctx, SeqBinding<D, T> seqBinding, int outerIdx) {
+        LiveList<Val<String>> lst = seqBinding.apply(ctx);
+        mySequenceOffsets.set(outerIdx, new ArrayList<>(lst.size() * 2));
+
+        return Subscription.dynamic(lst, (elt, innerIdx) -> initVal(elt, outerIdx, innerIdx));
+    }
+
+
+    private Subscription initVal(Val<String> source, int outerIdx, int innerIdx) {
 
         String initialValue = Objects.toString(source.getValue());
 
-        myOffsets[idx] = myStringBuffer.length();
         myStringBuffer.append(initialValue);
 
         if (source instanceof LiveTemplateImpl) {
+            return initTemplateBinding((LiveTemplateImpl<?>) source, outerIdx, innerIdx);
+        } else {
+            // constant and Val bindings go here
 
-            // add a replace handler to the bound value of the child
+            return source.orElseConst("null") // so that the values in changes are never null
+                         .changes()
+                         .subscribe(change -> {
+                             int startOffset = absoluteOffset(outerIdx, innerIdx);
+                             int endOffset = startOffset + change.getOldValue().length();
 
-            LiveTemplateImpl<?> subTemplate = (LiveTemplateImpl<?>) source;
-
-            ReplaceHandler subHandler = (relativeStart, relativeEnd, value) ->
-                handleContentChange(idx,
-                                    // the offsets here must be offset by the start of the subtemplate
-                                    myOffsets[idx] + relativeStart,
-                                    myOffsets[idx] + relativeEnd,
-                                    value);
-
-            subTemplate.addInternalReplaceHandler(subHandler);
-
-            return () -> subTemplate.removeInternalReplaceHandler(subHandler);
+                             handleContentChange(outerIdx, innerIdx, startOffset, endOffset, change.getNewValue());
+                         });
         }
+    }
 
-        return source.orElseConst("null") // so that the values in changes are never null
-                     .changes()
-                     .subscribe(change -> {
-                         int startOffset = myOffsets[idx];
-                         int endOffset = myOffsets[idx] + change.getOldValue().length();
 
-                         handleContentChange(idx, startOffset, endOffset, change.getNewValue());
-                     });
+    private int absoluteOffset(int outerIdx, int innerIdx) {
+        return myOuterOffsets[outerIdx] + mySequenceOffsets.get(outerIdx).get(innerIdx);
+    }
+
+
+    private <Sub> Subscription initTemplateBinding(LiveTemplateImpl<Sub> subTemplate, int outerIdx, int innerIdx) {
+
+        // add a replace handler to the bound value of the child
+
+        ReplaceHandler subHandler = (relativeStart, relativeEnd, value) -> {
+            int absoluteOffset = absoluteOffset(outerIdx, innerIdx);
+
+            handleContentChange(outerIdx, outerIdx,
+                                // the offsets here must be offset by the start of the subtemplate
+                                absoluteOffset + relativeStart,
+                                absoluteOffset + relativeEnd,
+                                value);
+        };
+
+        subTemplate.addInternalReplaceHandler(subHandler);
+
+        return () -> subTemplate.removeInternalReplaceHandler(subHandler);
     }
 
 

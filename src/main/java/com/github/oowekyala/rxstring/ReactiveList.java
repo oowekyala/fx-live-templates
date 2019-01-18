@@ -4,9 +4,7 @@ import static java.util.Collections.singletonList;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 
 import org.reactfx.EventStreams;
 import org.reactfx.Subscription;
@@ -19,14 +17,9 @@ import org.reactfx.value.Val;
 
 import javafx.beans.value.ObservableValue;
 import javafx.collections.ObservableList;
-import javafx.collections.ObservableSet;
 
 
 /**
- * Wrapper around an ObservableList&lt;ObservableValue&lt;T&gt;&gt; that presents
- * the interface of a LiveList&lt;T&gt; and subscribes to the changes of its individual
- * elements.
- *
  * @author Clément Fournier
  * @since 1.0
  */
@@ -79,15 +72,6 @@ public class ReactiveList<T> extends LiveListBase<T>
     }
 
 
-    /**
-     * Like {@link Subscription#dynamic(ObservableSet, Function)} but for an observable list.
-     *
-     * @param elems List
-     * @param f     Mapper, the first param is the element, the second is its index in the elems list
-     * @param <T>   Type of elements
-     *
-     * @return A subscription that closes the open subscriptions to the elements of the list
-     */
     private static <T> Subscription dynamicListSub(ObservableList<T> elems,
                                                    BiFunction<? super T, Integer, ? extends Subscription> f) {
 
@@ -129,20 +113,7 @@ public class ReactiveList<T> extends LiveListBase<T>
     }
 
 
-    /**
-     * Creates a new LiveList that reflects the values of the elements of the
-     * given list of observables. The change events pushed by the returned list
-     * correspond to either changes in the source collection, or changes in the
-     * individual elements. Both type of changes are considered regular list changes.
-     *
-     * @param source List of observables
-     * @param <T>    Type of values of the returned list
-     *
-     * @return A new live list
-     *
-     * @throws NullPointerException If the source collection is null
-     */
-    public static <T> LiveList<T> fromVals(ObservableList<? extends ObservableValue<? extends T>> source) {
-        return new ReactiveList<>(Objects.requireNonNull(source));
+    public static <T> ReactiveList<T> create(ObservableList<? extends ObservableValue<? extends T>> source) {
+        return new ReactiveList<>(source);
     }
 }
