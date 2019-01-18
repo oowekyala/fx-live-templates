@@ -1,5 +1,6 @@
 package com.github.oowekyala.rxstring;
 
+import java.util.function.Function;
 import java.util.logging.Logger;
 
 import org.reactfx.value.Val;

@@ -14,6 +14,9 @@ import javafx.collections.ObservableList;
 
 
 /**
+ * Extracts a LiveList[Val[String]] from a data context and binds its values.
+ * Used by the {@link LiveTemplateBuilderImpl}.
+ *
  * @author Clément Fournier
  * @since 1.0
  */

@@ -164,7 +164,7 @@ class ValBehaviorTest : FunSpec({
         val lt = LiveTemplate
                 .builder<DContext>()
                 .appendLine("<top>")
-                .bindConstSeq { it.strings }
+                .bindSeq { it.strings }
                 .endLine()
                 .append("</top>")
                 .toTemplate()
@@ -211,7 +211,7 @@ class ValBehaviorTest : FunSpec({
         val lt = LiveTemplate
                 .builder<DContext>()
                 .appendLine("<top>")
-                .bindConstSeq { it.strings }
+                .bindSeq { it.strings }
                 .endLine()
                 .append("</top>")
                 .toTemplate()
@@ -259,9 +259,9 @@ class ValBehaviorTest : FunSpec({
         val lt = LiveTemplate
                 .builder<DContext>()
                 .appendLine("<top>")
-                .bindConstSeq { it.strings }
+                .bindSeq { it.strings }
                 .endLine()
-                .bindConstSeq { it.strings2 }
+                .bindSeq { it.strings2 }
                 .endLine()
                 .append("</top>")
                 .toTemplate()
@@ -309,8 +309,6 @@ class ValBehaviorTest : FunSpec({
         """.trimIndent()
 
     }
-
-
 
     test("Test initial null value") {
         class DContext {
