@@ -19,6 +19,20 @@ import org.reactfx.value.ValBase;
  * This only manages to sequences. Other bindings are mapped to a sequence of
  * length 1.
  *
+ * Basically this class works as follows:
+ * * Conceptually, it presents a List[List[Val[String]]]
+ * * The outer list has fixed length, each item corresponds to one binding from the builder
+ * * Each inner list can have different lengths. Only SeqBindings have length > 1
+ * * We keep track of the text offsets of each inner list in myOuterOffsets
+ * * Additionally, each inner list keeps track of the text offsets of its individual elements
+ * relative to its own start in the document. This is tracked with {@link ValIdx} because since
+ * elements may be inserted or removed they're hard to keep tabs on without reifying them
+ * * When a Val changes (say in the inner list [i][j]), the absolute offset in the
+ * document where we want to perform the replacement is myOuterOffsets[i] + mySequences[i][j].
+ * Then we have to propagate the length difference to all indices to the right of it (we only need
+ * to update the rest of the inner sequence + the rest of the outer table).
+ * * When an item is removed or added from/into a sequence its following siblings are shifted as well
+ *
  * @author Clément Fournier
  * @since 1.0
  */

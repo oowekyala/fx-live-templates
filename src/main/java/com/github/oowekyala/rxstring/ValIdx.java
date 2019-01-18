@@ -13,11 +13,11 @@ import java.util.function.Consumer;
 final class ValIdx implements Comparable<ValIdx> {
 
     private final StringBuffer stringBuffer;
-    /** Index in the sequence table. */
+    /** Index in the table of sequence offsets. */
     private final int outerIdx;
-    /** This sequence. */
+    /** The enclosing sequence. */
     private final List<ValIdx> parent;
-    /** Offset relative to the start of the sequence. */
+    /** Text offset relative to the start of the sequence. */
     int relativeOffset;
     /** Index in the parent list. Shifted when elements are inserted to the left. */
     private int innerIdx;
@@ -73,7 +73,7 @@ final class ValIdx implements Comparable<ValIdx> {
 
 
     private void propagateRight(Consumer<ValIdx> idxConsumer) {
-        for (int j = currentSeqIdx() + 1; j < parent.size(); j++) {
+        for (int j = innerIdx + 1; j < parent.size(); j++) {
             idxConsumer.accept(parent.get(j));
         }
     }
@@ -101,13 +101,10 @@ final class ValIdx implements Comparable<ValIdx> {
 
 
     void delete() {
-        parent.remove(currentSeqIdx());
+        // propagate the shift before removing, otherwise we're
+        // missing the right sibling
         propagateItemShift(-1);
-    }
-
-
-    private int currentSeqIdx() {
-        return innerIdx;
+        parent.remove(innerIdx);
     }
 
 
@@ -123,7 +120,7 @@ final class ValIdx implements Comparable<ValIdx> {
 
     @Override
     public int compareTo(ValIdx o) {
-        return Integer.compare(currentSeqIdx(), o.currentSeqIdx());
+        return Integer.compare(innerIdx, o.innerIdx);
     }
 
 
