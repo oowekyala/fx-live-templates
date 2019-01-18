@@ -5,15 +5,21 @@ import java.util.function.Consumer;
 
 
 /**
+ * Keeps track of the relative offset of a binding in a sequence.
+ *
  * @author Clément Fournier
  * @since 1.0
  */
-class ValIdx implements Comparable<ValIdx> {
+final class ValIdx implements Comparable<ValIdx> {
 
-    final int outerIdx;
-    final List<ValIdx> parent;
-    int innerIdx;
+    /** Index in the sequence table. */
+    private final int outerIdx;
+    /** This sequence. */
+    private final List<ValIdx> parent;
+    /** Offset relative to the start of the sequence. */
     int relativeOffset;
+    /** Index in the parent list. Shifted when elements are inserted to the left. */
+    private int innerIdx;
     private int[] myOuterOffsets;
 
 
@@ -29,33 +35,22 @@ class ValIdx implements Comparable<ValIdx> {
         this.parent = parent;
         this.myOuterOffsets = myOuterOffsets;
 
-        int leftLength = innerIdx == 0 ? 0 : left().length();
-        relativeOffset = innerIdx == 0 ? 0 : leftLength + left().relativeOffset;
+        relativeOffset = innerIdx == 0 ? 0 : left().length() + left().relativeOffset;
 
         // you can't call left().length() after setting this node in its parent
-
-        if (innerIdx >= parent.size()) {
-            assert innerIdx == parent.size(); // it's just an append
-
-            parent.add(this);
-            if (!isInitializing) {
-                propagateOffsetShift(initialLength);
-            }
-
-        } else {
-            parent.add(innerIdx, this);
-            if (!isInitializing) {
-                propagateItemShift(+1);
-                propagateOffsetShift( initialLength);
-            }
+        parent.add(innerIdx, this);
+        if (!isInitializing) {
+            propagateItemShift(+1);
+            // The offset shift will be propagated via handleContentChange
+            // when inserting the initial value, so not here
+            // propagateOffsetShift(initialLength);
         }
-
     }
 
 
     int length() {
-        if (innerIdx < parent.size() - 1) {
-            // not the last
+        if (innerIdx + 1 < parent.size()) {
+            // there's a right node
             return right().relativeOffset - relativeOffset;
         } else {
             return myOuterOffsets[outerIdx + 1] - currentAbsoluteOffset();
@@ -63,30 +58,24 @@ class ValIdx implements Comparable<ValIdx> {
     }
 
 
-    List<ValIdx> siblings() {
-        return parent;
-    }
-
-
-    ValIdx left() {
+    private ValIdx left() {
         return innerIdx == 0 ? null : parent.get(innerIdx - 1);
     }
 
 
-    ValIdx right() {
-        List<ValIdx> siblings = siblings();
-        return innerIdx + 1 >= siblings.size() ? null : siblings.get(innerIdx + 1);
+    private ValIdx right() {
+        return innerIdx + 1 < parent.size() ? parent.get(innerIdx + 1) : null;
     }
 
 
-    void propagateRight(Consumer<ValIdx> idxConsumer) {
+    private void propagateRight(Consumer<ValIdx> idxConsumer) {
         for (int j = currentSeqIdx() + 1; j < parent.size(); j++) {
             idxConsumer.accept(parent.get(j));
         }
     }
 
 
-    void propagateItemShift(int shift) {
+    private void propagateItemShift(int shift) {
         propagateRight(idx -> idx.shiftRightInSeq(shift));
     }
 
@@ -108,12 +97,12 @@ class ValIdx implements Comparable<ValIdx> {
 
 
     void delete() {
-        siblings().remove(currentSeqIdx());
+        parent.remove(currentSeqIdx());
         propagateItemShift(-1);
     }
 
 
-    int currentSeqIdx() {
+    private int currentSeqIdx() {
         return innerIdx;
     }
 
@@ -123,7 +112,7 @@ class ValIdx implements Comparable<ValIdx> {
     }
 
 
-    void shiftRightInSeq(int shift) {
+    private void shiftRightInSeq(int shift) {
         innerIdx += shift;
     }
 

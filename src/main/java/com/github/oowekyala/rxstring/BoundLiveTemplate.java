@@ -50,6 +50,8 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         this.mySequences = new ArrayList<>(Collections.nCopies(bindings.size(), null));
 
         this.myStringBuffer = new StringBuffer();
+        this.myInternalReplaceHandlers = internalReplaceHandlers;
+        this.myUserHandler = userReplaceHandler;
 
         Subscription subscription = () -> {};
 
@@ -61,8 +63,6 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
         this.isInitialized = true;
         this.myCurCtxSubscription = subscription;
-        this.myUserHandler = userReplaceHandler;
-        this.myInternalReplaceHandlers = internalReplaceHandlers;
 
         myUserHandler.forEach(h -> safeHandlerCall(h, 0, 0, myStringBuffer.toString()));
     }
@@ -106,9 +106,10 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
         valIdx.propagateOffsetShift(value.length() - (end - start));
 
-        invalidator.push(null);
-        myUserHandler.forEach(h -> safeHandlerCall(h, start, end, value));
-
+        if (isInitialized) {
+            invalidator.push(null);
+            myUserHandler.forEach(h -> safeHandlerCall(h, start, end, value));
+        }
     }
 
 
@@ -134,8 +135,8 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         String initialValue = Objects.toString(stringSource.getValue());
         ValIdx valIdx = insertBindingAt(outerIdx, innerIdx, initialValue.length());
 
-        // TODO use handleContentChange? very probably
-        myStringBuffer.insert(valIdx.currentAbsoluteOffset(), initialValue);
+        int abs = valIdx.currentAbsoluteOffset();
+        handleContentChange(valIdx, abs, abs , initialValue);
 
         return origin.bindSingleVal(stringSource,
                                     valIdx::currentAbsoluteOffset,

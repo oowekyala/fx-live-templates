@@ -5,6 +5,7 @@ import io.kotlintest.matchers.haveSize
 import io.kotlintest.should
 import io.kotlintest.shouldBe
 import io.kotlintest.specs.FunSpec
+import javafx.collections.FXCollections
 import org.reactfx.value.Var
 import java.util.logging.Logger
 
@@ -234,6 +235,79 @@ class ReplaceHandlerTest : FunSpec({
         lt.value shouldBe """
             <top name='foo'>
             <sub name='foo' num='4'/>
+            </top>
+        """.trimIndent()
+    }
+
+
+    test("Test nested template sequence minimal change") {
+
+        class SubDContext {
+            val name = Var.newSimpleVar("sub")
+            val num = Var.newSimpleVar(4)
+        }
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+            val subs = FXCollections.observableArrayList(SubDContext())
+        }
+
+        val lt = LiveTemplate
+                .builder<DContext>()
+                .append("<top name='").bind { it.name }.appendLine("'>")
+                .bindTemplatedSeq({ it.subs }) { sub ->
+                    sub.append("<sub name='").bind { it.name }.append("' num='").bind { it.num }.appendLine("'/>")
+                }
+                .append("</top>")
+                .toTemplate()
+
+        val events = mutableListOf<ReplaceEvent>()
+
+        lt.addReplaceHandler { start, end, value ->
+            events += ReplaceEvent(start, end, value)
+        }
+
+        lt.value shouldBe null
+
+        val dc = DContext()
+        lt.dataContext = dc
+
+        val afterValue1 = """
+            <top name='top'>
+            <sub name='sub' num='4'/>
+            </top>
+        """.trimIndent()
+
+        lt.value shouldBe afterValue1
+
+        events should haveSize(1)
+        events.last() shouldBe ReplaceEvent(0, 0, afterValue1)
+
+        lt.dataContext.name.value = "foo"
+
+        events should haveSize(2)
+        events.last() shouldBe ReplaceEvent(11, 14, "foo")
+
+        lt.dataContext.subs[0].name.value = "foo"
+
+        events should haveSize(3)
+        events.last() shouldBe ReplaceEvent(28, 31, "foo")
+
+        lt.value shouldBe """
+            <top name='foo'>
+            <sub name='foo' num='4'/>
+            </top>
+        """.trimIndent()
+
+        lt.dataContext.subs.add(SubDContext())
+
+        events should haveSize(4)
+        events.last() shouldBe ReplaceEvent(43, 43, "<sub name='sub' num='4'/>\n")
+
+        lt.value shouldBe """
+            <top name='foo'>
+            <sub name='foo' num='4'/>
+            <sub name='sub' num='4'/>
             </top>
         """.trimIndent()
     }

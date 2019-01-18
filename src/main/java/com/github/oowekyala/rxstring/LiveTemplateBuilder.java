@@ -87,7 +87,7 @@ public interface LiveTemplateBuilder<D> {
      *
      * @param extractor          Extracts an observable value representing the
      *                           data context of the sub-template
-     * @param subTemplateBuilder A builder for the sub template
+     * @param subTemplateBuilder A function side-effecting on the builder of the sub-template
      * @param <T>                Type of the data context for the sub-template
      *
      * @return This builder
@@ -113,6 +113,22 @@ public interface LiveTemplateBuilder<D> {
      */
     <T> LiveTemplateBuilder<D> bindSeq(SeqRenderer<? super T> renderer,
                                        Function<D, ? extends ObservableList<? extends T>> extractor);
+
+
+    /**
+     * Binds a property of the data context that returns an observable list of items,
+     * that are rendered with {@link SeqRenderer#templated(Consumer)}.
+     *
+     * @param extractor          Value extractor
+     * @param subTemplateBuilder A function side-effecting on the builder of the sub-template
+     * @param <T>                Type of items of the list
+     *
+     * @return This builder
+     */
+    default <T> LiveTemplateBuilder<D> bindTemplatedSeq(Function<D, ? extends ObservableList<? extends T>> extractor,
+                                                        Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
+        return bindSeq(SeqRenderer.templated(subTemplateBuilder), extractor);
+    }
 
 
     default LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<String>> extractor) {
