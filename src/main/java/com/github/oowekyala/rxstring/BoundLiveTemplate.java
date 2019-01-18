@@ -133,6 +133,8 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         // this thing is captured which allows its index to remain up to date
         ValIdx valIdx = insertBindingAt(outerIdx, innerIdx);
 
+        LiveTemplate.LOGGER.finest(() -> "Initializing an elt at " + valIdx);
+
         String initialValue = stringSource.getValue();
         int abs = valIdx.currentAbsoluteOffset();
 
@@ -142,7 +144,11 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
                                     valIdx::currentAbsoluteOffset,
                                     (start, end, value) -> handleContentChange(valIdx, start, end, value))
                      // part of the subscription
-                     .and(() -> deleteBindingAt(valIdx));
+                     .and(() -> {
+                         LiveTemplate.LOGGER.finest(() -> "Deleting an elt at " + valIdx);
+
+                         deleteBindingAt(valIdx);
+                     });
     }
 
 

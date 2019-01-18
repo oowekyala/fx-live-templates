@@ -23,6 +23,7 @@ class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
     // TODO everything could be mapped to seqs here and support low-level delimiting logic
 
     private final List<BindingExtractor<D>> myBindings;
+    private String myDefaultIndent = "    ";
 
 
     private LiveTemplateBuilderImpl(List<BindingExtractor<D>> bindings) {
@@ -46,6 +47,19 @@ class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
         } else {
             myBindings.add(BindingExtractor.makeConstant(string));
         }
+        return this;
+    }
+
+
+    @Override
+    public LiveTemplateBuilder<D> appendIndent(int level) {
+        return appendIndent(level, myDefaultIndent);
+    }
+
+
+    @Override
+    public LiveTemplateBuilder<D> withDefaultIndent(String indentStyle) {
+        myDefaultIndent = Objects.requireNonNull(indentStyle);
         return this;
     }
 

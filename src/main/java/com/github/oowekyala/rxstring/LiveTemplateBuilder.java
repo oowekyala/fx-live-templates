@@ -56,6 +56,49 @@ public interface LiveTemplateBuilder<D> {
 
 
     /**
+     * Appends [level] times the {@linkplain #withDefaultIndent(String) default indent string}.
+     *
+     * @param level Indent level
+     *
+     * @return This builder
+     *
+     * @see #appendIndent(int, String)
+     */
+    LiveTemplateBuilder<D> appendIndent(int level);
+
+
+    /**
+     * Sets the default indentation string used by {@link #appendIndent(int)}.
+     *
+     * @param indentStyle New default indent style
+     *
+     * @return This builder
+     *
+     * @throws NullPointerException if the identStyle is null
+     */
+    LiveTemplateBuilder<D> withDefaultIndent(String indentStyle);
+
+
+    /**
+     * Appends [level] times the given [indentStyle].
+     *
+     * @param level       Indent level
+     * @param indentStyle Indent string
+     *
+     * @return This builder
+     *
+     * @throws NullPointerException if the identStyle is null
+     */
+    default LiveTemplateBuilder<D> appendIndent(int level, String indentStyle) {
+        while (level-- > 0) {
+            append(indentStyle);
+        }
+
+        return this;
+    }
+
+
+    /**
      * Binds a property of the data context to be rendered with {@link Object#toString()}.
      * If the object is null, value has a null value, the empty string will be used.
      *
@@ -107,6 +150,8 @@ public interface LiveTemplateBuilder<D> {
      * is not rendered every time there's a change in one item. If the renderer function
      * itself is a live template, then the minimal changes from that template will be forwarded,
      * so the changes will be even finer.
+     *
+     * FIXME this doesn't play well with JavaFX's native ListProperty because it fires too many events
      *
      * @param renderer  Renderer function
      * @param extractor Value extractor
@@ -191,9 +236,11 @@ public interface LiveTemplateBuilder<D> {
 
 
         static <T> ValueRenderer<T> templated(Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
+            LiveTemplateBuilder<T> builder = LiveTemplate.builder();
+            subTemplateBuilder.accept(builder);
+            // create a single builder that will spawn several templates
+
             return t -> {
-                LiveTemplateBuilder<T> builder = LiveTemplate.builder();
-                subTemplateBuilder.accept(builder);
                 LiveTemplate<T> template = builder.toTemplate();
                 template.setDataContext(t);
                 return template;

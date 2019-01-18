@@ -52,7 +52,10 @@ interface BindingExtractor<D> {
 
             subTemplate.addInternalReplaceHandler(subHandler);
 
-            return () -> subTemplate.removeInternalReplaceHandler(subHandler);
+            return () -> {
+                subTemplate.removeInternalReplaceHandler(subHandler);
+                subTemplate.setDataContext(null);
+            };
 
 
         } else {
@@ -61,7 +64,6 @@ interface BindingExtractor<D> {
                       .subscribe(change -> {
                           int startOffset = absoluteOffset.get();
                           int endOffset = startOffset + change.getOldValue().length();
-
                           callback.replace(startOffset, endOffset, change.getNewValue());
                       });
         }
@@ -87,10 +89,13 @@ interface BindingExtractor<D> {
     static <D, Sub> BindingExtractor<D> makeTemplateBinding(Function<? super D, ? extends ObservableValue<Sub>> extractor,
                                                             Consumer<LiveTemplateBuilder<Sub>> subTemplateBuilder) {
 
+        // only build the template once
+        LiveTemplateBuilder<Sub> builder = LiveTemplate.builder();
+        subTemplateBuilder.accept(builder);
+        LiveTemplate<Sub> template = builder.toTemplate();
+
         Function<ObservableValue<Sub>, LiveTemplate<Sub>> templateMaker = obsT -> {
-            LiveTemplateBuilder<Sub> builder = LiveTemplate.builder();
-            subTemplateBuilder.accept(builder);
-            LiveTemplate<Sub> template = builder.toTemplate();
+            template.dataContextProperty().unbind();
             template.dataContextProperty().bind(obsT);
             return template;
         };

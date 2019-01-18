@@ -74,6 +74,9 @@ public interface LiveTemplate<D> extends Val<String> {
      * Exceptions in handlers are logged with {@link #LOGGER} but are
      * not rethrown.
      *
+     * FIXME: handlers must be added BEFORE calling {@link #setDataContext(Object)},
+     * otherwise the initial replacement is lost.
+     *
      * @param handler the new handler to set
      *
      * @throws NullPointerException if the given handler is null

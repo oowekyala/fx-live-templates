@@ -301,13 +301,90 @@ class ReplaceHandlerTest : FunSpec({
 
         lt.dataContext.subs.add(SubDContext())
 
-        events should haveSize(4)
-        events.last() shouldBe ReplaceEvent(43, 43, "<sub name='sub' num='4'/>\n")
-
         lt.value shouldBe """
             <top name='foo'>
             <sub name='foo' num='4'/>
             <sub name='sub' num='4'/>
+            </top>
+        """.trimIndent()
+
+        events should haveSize(4)
+        events.last() shouldBe ReplaceEvent(43, 43, "<sub name='sub' num='4'/>\n")
+    }
+
+    test("Test binding a nested template") {
+
+        class SubDContext {
+            val name = Var.newSimpleVar("sub")
+            val num = Var.newSimpleVar(4)
+        }
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+            val subs = FXCollections.observableArrayList(SubDContext())
+        }
+
+        val lt = LiveTemplate
+                .builder<DContext>()
+                .append("<top name='").bind { it.name }.appendLine("'>")
+                .bindTemplatedSeq({ it.subs }) { sub ->
+                    sub.append("<sub name='").bind { it.name }.append("' num='").bind { it.num }.appendLine("'/>")
+                }
+                .append("</top>")
+                .toTemplate()
+
+        val events = mutableListOf<ReplaceEvent>()
+
+        lt.addReplaceHandler { start, end, value ->
+            events += ReplaceEvent(start, end, value)
+        }
+
+        lt.value shouldBe null
+
+        val dc = DContext()
+        lt.dataContext = dc
+
+        val afterValue1 = """
+            <top name='top'>
+            <sub name='sub' num='4'/>
+            </top>
+        """.trimIndent()
+
+        lt.value shouldBe afterValue1
+
+        events should haveSize(1)
+        events.last() shouldBe ReplaceEvent(0, 0, afterValue1)
+
+        lt.dataContext.name.value = "foo"
+
+        events should haveSize(2)
+        events.last() shouldBe ReplaceEvent(11, 14, "foo")
+
+        val nameBinding = Var.newSimpleVar("bindSource")
+        val numBinding = Var.newSimpleVar(10)
+
+        lt.dataContext.subs[0].name.bind(nameBinding)
+        lt.dataContext.subs[0].num.bind(numBinding)
+
+
+        lt.value shouldBe """
+            <top name='foo'>
+            <sub name='bindSource' num='10'/>
+            </top>
+        """.trimIndent()
+
+        events should haveSize(4)
+        events[2] shouldBe ReplaceEvent(28, 31, "bindSource")
+        events.last() shouldBe ReplaceEvent(45, 46, "10")
+
+        numBinding.value = 15
+
+        events should haveSize(5)
+        events.last() shouldBe ReplaceEvent(45, 47, "15")
+
+        lt.value shouldBe """
+            <top name='foo'>
+            <sub name='bindSource' num='15'/>
             </top>
         """.trimIndent()
     }
