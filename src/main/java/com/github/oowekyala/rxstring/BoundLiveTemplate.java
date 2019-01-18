@@ -5,7 +5,6 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Consumer;
 import java.util.logging.Level;
 
 import org.reactfx.EventSource;
@@ -98,21 +97,6 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     // for construction
 
 
-    private void propagateOffsetChange(ValIdx valIdx, int diff) {
-        if (diff == 0) {
-            return;
-        }
-
-        // the relative change is propagated to all elements right of this one in the inner table
-        valIdx.propagateRight(idx -> idx.relativeOffset += diff);
-
-        // and to all outer indices right of this one
-        // the inner indices of the other sequences need not be touched
-        for (int j = valIdx.outerIdx + 1; j < myOuterOffsets.length; j++) {
-            myOuterOffsets[j] += diff;
-        }
-    }
-
 
     private void handleContentChange(ValIdx valIdx, int start, int end, String value) {
         myStringBuffer.replace(start, end, value);
@@ -120,7 +104,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         // propagate the change to the templates that contain this one
         myInternalReplaceHandlers.forEach(h -> h.replace(start, end, value));
 
-        propagateOffsetChange(valIdx, value.length() - (end - start));
+        valIdx.propagateOffsetShift(value.length() - (end - start));
 
         invalidator.push(null);
         myUserHandler.forEach(h -> safeHandlerCall(h, start, end, value));
@@ -146,6 +130,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
         // sequence bindings will call this method when their content has changed
         // so we must take care of the offsets
+
         String initialValue = Objects.toString(stringSource.getValue());
         ValIdx valIdx = insertBindingAt(outerIdx, innerIdx, initialValue.length());
 
@@ -160,24 +145,20 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     }
 
 
-    private void propagateItemShift(ValIdx from, int shift) {
-        from.propagateRight(idx -> idx.shiftRightInSeq(shift));
-    }
 
 
     private void deleteBindingAt(ValIdx idx) {
 
         int start = idx.currentAbsoluteOffset();
-        int deletedLength = sizeOf(idx);
+        int deletedLength = idx.length();
         handleContentChange(idx, start, start + deletedLength, "");
 
-        propagateItemShift(idx, -1);
         idx.delete();
     }
 
 
     private ValIdx insertBindingAt(int outerIdx, int innerIdx, int insertedLength) {
-        ValIdx valIdx = new ValIdx(outerIdx, innerIdx, mySequences.get(outerIdx));
+        ValIdx valIdx = new ValIdx(myOuterOffsets, outerIdx, innerIdx, mySequences.get(outerIdx), insertedLength, !isInitialized);
 
         if (!isInitialized) {
             // initialisation pass is special for now
@@ -185,35 +166,10 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
             return valIdx;
         }
 
-        // length difference between prev and current to propagate right
-        int diff;
-        if (valIdx.innerIdx >= valIdx.parent.size()) {
-            assert valIdx.innerIdx == valIdx.parent.size();
-            valIdx.relativeOffset = valIdx.innerIdx == 0 ? 0 : valIdx.left().relativeOffset + sizeOf(valIdx.left());
-            // the siblings are affected, but not this valIdx
-            propagateItemShift(valIdx, +1);
-            diff = insertedLength;
-        } else {
-            // overwrite something else, already unbound
-            diff = sizeOf(valIdx) - insertedLength;
-        }
-
-        propagateOffsetChange(valIdx, diff);
-
         return valIdx;
     }
 
 
-    /** Gets the size in characters of the sequence element at the specified position. */
-    private int sizeOf(ValIdx idx) {
-
-        if (idx.innerIdx < idx.siblings().size() - 1) {
-            // not the last
-            return idx.right().relativeOffset - idx.relativeOffset;
-        } else {
-            return myOuterOffsets[idx.outerIdx + 1] - idx.currentAbsoluteOffset();
-        }
-    }
 
     private static void safeHandlerCall(ReplaceHandler h, int start, int end, String value) {
         try {
@@ -222,81 +178,4 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
             LiveTemplate.LOGGER.log(Level.WARNING, e, () -> "An exception was thrown by an external replacement handler");
         }
     }
-
-
-    private class ValIdx implements Comparable<ValIdx> {
-
-        final int outerIdx;
-        final List<ValIdx> parent;
-        int innerIdx;
-        int relativeOffset;
-
-
-        private ValIdx(int outerIdx,
-                       int innerIdx,
-                       List<ValIdx> parent) {
-            this.outerIdx = outerIdx;
-            this.innerIdx = innerIdx;
-            this.parent = parent;
-
-            if (innerIdx >= parent.size()) {
-                parent.add(this);
-            } else {
-                parent.set(innerIdx, this);
-            }
-        }
-
-
-        List<ValIdx> siblings() {
-            return parent;
-        }
-
-
-        ValIdx left() {
-            return innerIdx == 0 ? null : siblings().get(innerIdx - 1);
-        }
-
-
-        ValIdx right() {
-            List<ValIdx> siblings = siblings();
-            return innerIdx + 1 >= siblings.size() ? null : siblings.get(innerIdx + 1);
-        }
-
-
-        void propagateRight(Consumer<ValIdx> idxConsumer) {
-            for (int j = currentSeqIdx() + 1; j < parent.size(); j++) {
-                idxConsumer.accept(parent.get(j));
-            }
-        }
-
-
-        void delete() {
-            siblings().remove(currentSeqIdx());
-        }
-
-
-        int currentSeqIdx() {
-            return innerIdx;
-        }
-
-
-        int currentAbsoluteOffset() {
-            return myOuterOffsets[outerIdx] + relativeOffset;
-        }
-
-
-        void shiftRightInSeq(int shift) {
-            innerIdx += shift;
-        }
-
-
-        @Override
-        public int compareTo(BoundLiveTemplate.ValIdx o) {
-            return Integer.compare(currentSeqIdx(), o.currentSeqIdx());
-        }
-
-
-    }
-
-
 }

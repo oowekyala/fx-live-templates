@@ -249,7 +249,7 @@ class ValBehaviorTest : FunSpec({
     }
 
 
-    test("f:Test insertion inside seq") {
+    test("Test insertion inside seq") {
 
         class DContext {
             val strings: LiveList<String> = LiveArrayList<String>("sub", ",trolo")
@@ -294,7 +294,7 @@ class ValBehaviorTest : FunSpec({
 
         lt.value shouldBe """
             <top>
-            trolo,foo,olol
+            sub,foo,olol
             a,b
             </top>
         """.trimIndent()
@@ -303,7 +303,7 @@ class ValBehaviorTest : FunSpec({
 
         lt.value shouldBe """
             <top>
-            trolo,foo,olol
+            sub,foo,olol
             c,b
             </top>
         """.trimIndent()
