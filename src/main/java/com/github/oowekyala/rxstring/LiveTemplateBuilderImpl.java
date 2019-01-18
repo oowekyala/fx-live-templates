@@ -20,6 +20,8 @@ import javafx.collections.ObservableList;
  */
 class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
 
+    // TODO everything could be mapped to seqs here and support low-level delimiting logic
+
     private final List<BindingExtractor<D>> myBindings;
 
 
@@ -64,7 +66,7 @@ class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
 
 
     @Override
-    public <T> LiveTemplateBuilder<D> bindSeq(SeqRenderer<? super T> renderer, Function<D, ? extends ObservableList<? extends T>> extractor) {
+    public <T> LiveTemplateBuilder<D> bindSeq(ValueRenderer<? super T> renderer, Function<D, ? extends ObservableList<? extends T>> extractor) {
         myBindings.add(BindingExtractor.makeSeqBinding(extractor, renderer));
         return this;
     }

@@ -16,6 +16,8 @@ import org.reactfx.value.ValBase;
 
 /**
  * The actual implementation of a live template, bound to a known data context.
+ * This only manages to sequences. Other bindings are mapped to a sequence of
+ * length 1.
  *
  * @author Clément Fournier
  * @since 1.0
@@ -112,7 +114,6 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     }
 
 
-    @SuppressWarnings("unchecked")
     private Subscription initBinding(D context, BindingExtractor<D> bindingExtractor, int outerIdx) {
         myOuterOffsets[outerIdx] = myStringBuffer.length();
 
@@ -124,7 +125,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
 
     /**
-     * Initialises a single Val at the given indices.
+     * Initialises a single Val in a sequence at the given indices.
      */
     private Subscription initVal(BindingExtractor<D> origin, Val<String> stringSource, int outerIdx, int innerIdx) {
         // sequence bindings will call this method when their content has changed

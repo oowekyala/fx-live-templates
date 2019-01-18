@@ -101,7 +101,7 @@ public interface LiveTemplateBuilder<D> {
 
     /**
      * Binds a property of the data context that returns an observable list of items.
-     * Items will be mapped to strings with the specified {@link SeqRenderer} function.
+     * Items will be mapped to strings with the specified {@link ValueRenderer} function.
      * Changes in individual items of the list are reflected in the value of the template.
      * Only minimal changes are pushed: items are rendered incrementally (ie the whole list
      * is not rendered every time there's a change in one item. If the renderer function
@@ -114,13 +114,13 @@ public interface LiveTemplateBuilder<D> {
      *
      * @return This builder
      */
-    <T> LiveTemplateBuilder<D> bindSeq(SeqRenderer<? super T> renderer,
+    <T> LiveTemplateBuilder<D> bindSeq(ValueRenderer<? super T> renderer,
                                        Function<D, ? extends ObservableList<? extends T>> extractor);
 
 
     /**
      * Binds a property of the data context that returns an observable list of items,
-     * that are rendered with {@link SeqRenderer#templated(Consumer)}.
+     * that are rendered with {@link ValueRenderer#templated(Consumer)}.
      *
      * @param extractor          Value extractor
      * @param subTemplateBuilder A function side-effecting on the builder of the sub-template
@@ -130,19 +130,19 @@ public interface LiveTemplateBuilder<D> {
      */
     default <T> LiveTemplateBuilder<D> bindTemplatedSeq(Function<D, ? extends ObservableList<? extends T>> extractor,
                                                         Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
-        return bindSeq(SeqRenderer.templated(subTemplateBuilder), extractor);
+        return bindSeq(ValueRenderer.templated(subTemplateBuilder), extractor);
     }
 
 
     /**
-     * Binds an observable list of strings, rendered with {@link SeqRenderer#identity()}.
+     * Binds an observable list of strings, rendered with {@link ValueRenderer#identity()}.
      *
      * @param extractor Value extractor
      *
      * @return This builder
      */
     default LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<String>> extractor) {
-        return bindSeq(SeqRenderer.identity(), extractor);
+        return bindSeq(ValueRenderer.identity(), extractor);
     }
 
 
@@ -162,34 +162,35 @@ public interface LiveTemplateBuilder<D> {
 
 
     /**
-     * An object used to render sequences
+     * A type used to render objects of type T in a template.
+     * This interface provides many ready-to-use implementations.
      *
-     * @param <T>
+     * @param <T> Type of values to map
      */
-    interface SeqRenderer<T> extends Function<T, ObservableValue<String>> {
+    interface ValueRenderer<T> extends Function<T, ObservableValue<String>> {
 
 
-        static <T> SeqRenderer<T> asString() {
+        static <T> ValueRenderer<T> asString() {
             return asString(Objects::toString);
         }
 
 
-        static <T> SeqRenderer<T> asString(Function<? super T, String> f) {
+        static <T> ValueRenderer<T> asString(Function<? super T, String> f) {
             return f.andThen(Val::constant)::apply;
         }
 
 
-        static SeqRenderer<? extends ObservableValue<String>> selfValue() {
+        static ValueRenderer<? extends ObservableValue<String>> selfValue() {
             return obs -> Val.map(obs, Function.identity());
         }
 
 
-        static SeqRenderer<String> identity() {
+        static ValueRenderer<String> identity() {
             return asString(Function.identity());
         }
 
 
-        static <T> SeqRenderer<T> templated(Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
+        static <T> ValueRenderer<T> templated(Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
             return t -> {
                 LiveTemplateBuilder<T> builder = LiveTemplate.builder();
                 subTemplateBuilder.accept(builder);
