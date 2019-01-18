@@ -2,7 +2,10 @@ package com.github.oowekyala.rxstring;
 
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
+import org.reactfx.Subscription;
+import org.reactfx.collection.LiveArrayList;
 import org.reactfx.collection.LiveList;
 import org.reactfx.value.Val;
 
@@ -14,82 +17,98 @@ import javafx.collections.ObservableList;
  * @author Clément Fournier
  * @since 1.0
  */
-abstract class BindingExtractor<D, T> implements Function<D, T> {
+@FunctionalInterface
+interface BindingExtractor<D> {
+
+    LiveList<Val<String>> extract(D context);
 
 
-    static class SeqBinding<D, T> extends BindingExtractor<D, LiveList<Val<String>>> {
+    // on pourrait dispatcher mais ballec
+    default Subscription bindSingleVal(Val<String> val, Supplier<Integer> absoluteOffset, ReplaceHandler callback) {
 
-        private final Function<D, ? extends ObservableList<T>> extractor;
-        private final Function<? super T, Val<String>> renderer;
+        if (val instanceof LiveTemplateImpl) {
+
+            LiveTemplateImpl<?> subTemplate = (LiveTemplateImpl<?>) val;
+
+            // add a replace handler to the bound value of the child
+
+            ReplaceHandler subHandler = (relativeStart, relativeEnd, value) -> {
+                int absolute = absoluteOffset.get();
+
+                callback.replace(
+                    // the offsets here must be offset by the start of the subtemplate
+                    absolute + relativeStart,
+                    absolute + relativeEnd,
+                    value);
+            };
+
+            subTemplate.addInternalReplaceHandler(subHandler);
+
+            return () -> subTemplate.removeInternalReplaceHandler(subHandler);
 
 
-        SeqBinding(Function<D, ? extends ObservableList<T>> extractor, Function<? super T, Val<String>> renderer) {
-            this.extractor = extractor;
-            this.renderer = renderer;
+        } else {
+            return val.orElseConst("null") // so that the values in changes are never null
+                      .changes()
+                      .subscribe(change -> {
+                          int startOffset = absoluteOffset.get();
+                          int endOffset = startOffset + change.getOldValue().length();
+
+                          callback.replace(startOffset, endOffset, change.getNewValue());
+                      });
         }
-
-
-        @Override
-        public LiveList<Val<String>> apply(D d) {
-            return LiveList.map(extractor.apply(d), renderer);
-        }
-
     }
 
-    // Those are simple to handle
 
-    static final class ConstantBinding<T> extends ValExtractor<T> {
+    static <T> ConstantBinding<T> makeConstant(String s) {
+        return new ConstantBinding<>(s);
+    }
 
+
+    static <T> BindingExtractor<T> lift(Function<? super T, ObservableValue<String>> f) {
+        return t -> new LiveArrayList<>(f.andThen(Val::wrap).apply(t));
+    }
+
+
+    static <D, T> BindingExtractor<D> makeSeqBinding(Function<D, ? extends ObservableList<T>> extractor, Function<? super T, Val<String>> renderer) {
+        return d -> LiveList.map(extractor.apply(d), renderer);
+    }
+
+
+    static <D, Sub> BindingExtractor<D> makeTemplateBinding(Function<? super D, ? extends ObservableValue<Sub>> extractor,
+                                                            Consumer<LiveTemplateBuilder<Sub>> subTemplateBuilder) {
+
+        Function<ObservableValue<Sub>, LiveTemplate<Sub>> templateMaker = obsT -> {
+            LiveTemplateBuilder<Sub> builder = LiveTemplate.builder();
+            subTemplateBuilder.accept(builder);
+            LiveTemplate<Sub> template = builder.toTemplate();
+            template.dataContextProperty().bind(obsT);
+            return template;
+        };
+
+        return lift(extractor.andThen(templateMaker));
+    }
+
+
+    /**
+     * Represents a constant binding. Distinct from the others because it allows
+     * to compact them in the {@link LiveTemplateBuilderImpl}.
+     *
+     * @param <D> Anything
+     */
+    final class ConstantBinding<D> implements BindingExtractor<D> {
         final String constant;
 
 
         ConstantBinding(String constant) {
-            super(d -> Val.constant(constant));
             this.constant = constant;
         }
-    }
-
-    static final class TemplateBinding<D, Sub> extends BindingExtractor<D, LiveTemplate<Sub>> {
-
-
-        private final Function<? super D, LiveTemplate<Sub>> extractor;
-
-
-        TemplateBinding(Function<? super D, ? extends ObservableValue<Sub>> extractor,
-                        Consumer<LiveTemplateBuilder<Sub>> subTemplateBuilder) {
-
-            Function<ObservableValue<Sub>, LiveTemplate<Sub>> templateMaker = obsT -> {
-                LiveTemplateBuilder<Sub> builder = LiveTemplate.builder();
-                subTemplateBuilder.accept(builder);
-                LiveTemplate<Sub> template = builder.toTemplate();
-                template.dataContextProperty().bind(obsT);
-                return template;
-            };
-
-            this.extractor = extractor.andThen(templateMaker);
-
-        }
 
 
         @Override
-        public LiveTemplate<Sub> apply(D d) {
-            return extractor.apply(d);
+        public LiveList<Val<String>> extract(D context) {
+            return new LiveArrayList<>(Val.constant(constant));
         }
     }
 
-    static class ValExtractor<D> extends BindingExtractor<D, Val<String>> {
-
-        private final Function<? super D, ? extends Val<String>> extractor;
-
-
-        ValExtractor(Function<? super D, ? extends Val<String>> extractor) {
-            this.extractor = extractor;
-        }
-
-
-        @Override
-        public Val<String> apply(D d) {
-            return extractor.apply(d);
-        }
-    }
 }

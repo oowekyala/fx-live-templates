@@ -10,8 +10,6 @@ import java.util.function.Function;
 import org.reactfx.value.Val;
 
 import com.github.oowekyala.rxstring.BindingExtractor.ConstantBinding;
-import com.github.oowekyala.rxstring.BindingExtractor.TemplateBinding;
-import com.github.oowekyala.rxstring.BindingExtractor.ValExtractor;
 import javafx.beans.value.ObservableValue;
 
 
@@ -21,10 +19,10 @@ import javafx.beans.value.ObservableValue;
  */
 class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
 
-    private final List<BindingExtractor<D, ?>> myBindings;
+    private final List<BindingExtractor<D>> myBindings;
 
 
-    private LiveTemplateBuilderImpl(List<BindingExtractor<D, ?>> bindings) {
+    private LiveTemplateBuilderImpl(List<BindingExtractor<D>> bindings) {
         this.myBindings = new ArrayList<>(bindings);
     }
 
@@ -51,7 +49,7 @@ class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
 
     @Override
     public <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<T>> extractor, Function<? super T, String> renderer) {
-        myBindings.add(new ValExtractor<>(extractor.andThen(Val::wrap).andThen(val -> val.map(renderer))));
+        myBindings.add(BindingExtractor.lift(extractor.andThen(Val::wrap).andThen(val -> val.map(renderer))));
         return this;
     }
 
@@ -59,7 +57,7 @@ class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
     @Override
     public <T> LiveTemplateBuilder<D> bindTemplate(Function<? super D, ? extends ObservableValue<T>> extractor,
                                                    Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
-        myBindings.add(new TemplateBinding<>(extractor, subTemplateBuilder));
+        myBindings.add(BindingExtractor.makeTemplateBinding(extractor, subTemplateBuilder));
         return this;
     }
 
