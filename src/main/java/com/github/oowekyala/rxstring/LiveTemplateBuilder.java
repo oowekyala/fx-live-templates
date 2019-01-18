@@ -57,6 +57,7 @@ public interface LiveTemplateBuilder<D> {
 
     /**
      * Binds a property of the data context to be rendered with {@link Object#toString()}.
+     * If the object is null, value has a null value, the empty string will be used.
      *
      * @param extractor Extracts the observable value to render from the data context
      *
@@ -65,13 +66,14 @@ public interface LiveTemplateBuilder<D> {
      * @see #bind(Function, Function)
      */
     default <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<T>> extractor) {
-        return bind(extractor, Objects::toString);
+        return bind(extractor, Object::toString);
     }
 
 
     /**
      * Binds a property of the data context to be rendered with the given string conversion
-     * function.
+     * function. If the conversion function returns null, then the empty string will be used
+     * instead.
      *
      * @param extractor Extracts the observable value to render from the data context
      * @param renderer  Converts the value to a string. Should handle null values if the
@@ -84,6 +86,7 @@ public interface LiveTemplateBuilder<D> {
 
     /**
      * Binds a property of the data context to be presented with a sub-template.
+     * When the property has a null value, the string is not output.
      *
      * @param extractor          Extracts an observable value representing the
      *                           data context of the sub-template
@@ -131,11 +134,38 @@ public interface LiveTemplateBuilder<D> {
     }
 
 
+    /**
+     * Binds an observable list of strings, rendered with {@link SeqRenderer#identity()}.
+     *
+     * @param extractor Value extractor
+     *
+     * @return This builder
+     */
     default LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<String>> extractor) {
         return bindSeq(SeqRenderer.identity(), extractor);
     }
 
 
+    /**
+     * Returns a new builder that has all the current state of this builder.
+     */
+    LiveTemplateBuilder<D> copy();
+
+
+    /**
+     * Builds a new live template ready for use. This builder can still be used
+     * after that.
+     *
+     * @return A new live template
+     */
+    LiveTemplate<D> toTemplate();
+
+
+    /**
+     * An object used to render sequences
+     *
+     * @param <T>
+     */
     interface SeqRenderer<T> extends Function<T, ObservableValue<String>> {
 
 
@@ -169,18 +199,4 @@ public interface LiveTemplateBuilder<D> {
             };
         }
     }
-
-    /**
-     * Returns a new builder that has all the current state of this builder.
-     */
-    LiveTemplateBuilder<D> copy();
-
-
-    /**
-     * Builds a new live template ready for use. This builder can still be used
-     * after that.
-     *
-     * @return A new live template
-     */
-    LiveTemplate<D> toTemplate();
 }

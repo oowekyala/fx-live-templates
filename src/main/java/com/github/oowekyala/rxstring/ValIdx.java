@@ -12,6 +12,7 @@ import java.util.function.Consumer;
  */
 final class ValIdx implements Comparable<ValIdx> {
 
+    private final StringBuffer stringBuffer;
     /** Index in the sequence table. */
     private final int outerIdx;
     /** This sequence. */
@@ -24,12 +25,13 @@ final class ValIdx implements Comparable<ValIdx> {
 
 
     ValIdx(int[] myOuterOffsets,
+           StringBuffer stringBuffer,
            int outerIdx,
            int innerIdx,
            List<ValIdx> parent,
-           int initialLength,
            boolean isInitializing) {
 
+        this.stringBuffer = stringBuffer;
         this.outerIdx = outerIdx;
         this.innerIdx = innerIdx;
         this.parent = parent;
@@ -52,8 +54,10 @@ final class ValIdx implements Comparable<ValIdx> {
         if (innerIdx + 1 < parent.size()) {
             // there's a right node
             return right().relativeOffset - relativeOffset;
-        } else {
+        } else if (outerIdx + 1 < myOuterOffsets.length) {
             return myOuterOffsets[outerIdx + 1] - currentAbsoluteOffset();
+        } else {
+            return stringBuffer.length() - currentAbsoluteOffset();
         }
     }
 

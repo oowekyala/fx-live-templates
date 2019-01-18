@@ -34,7 +34,10 @@ public interface LiveTemplate<D> extends Val<String> {
 
 
     /**
-     * Rebinds this template to the given data context.
+     * Rebinds this template to the given data context. If null, then
+     * just unbinds the current data context, if any, and sets this
+     * value to empty. The {@linkplain #addReplaceHandler(ReplaceHandler) replacement handlers}
+     * are not called when unbinding.
      *
      * @param context The new data context
      *
@@ -66,7 +69,7 @@ public interface LiveTemplate<D> extends Val<String> {
      *
      * Handlers are called once with the whole evaluated value of this
      * template when switching data contexts (parameters (0,0,text)).
-     * Then they're only called incrementally.
+     * After that they're only called incrementally.
      *
      * Exceptions in handlers are logged with {@link #LOGGER} but are
      * not rethrown.

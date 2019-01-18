@@ -26,6 +26,11 @@ interface BindingExtractor<D> {
     LiveList<Val<String>> extract(D context);
 
 
+    /**
+     * Binds the given val to relevant replacement logic, and returns a subscription to unbind it.
+     * Text deletion should not be handled in this subscription, it's handled upstream. The subscription
+     * is just supposed to stop observing the val and not cleanup.
+     */
     // on pourrait dispatcher mais ballec
     default Subscription bindSingleVal(Val<String> val, Supplier<Integer> absoluteOffset, ReplaceHandler callback) {
 
@@ -51,7 +56,7 @@ interface BindingExtractor<D> {
 
 
         } else {
-            return val.orElseConst("null") // so that the values in changes are never null
+            return val.orElseConst("") // so that the values in changes are never null
                       .changes()
                       .subscribe(change -> {
                           int startOffset = absoluteOffset.get();
@@ -73,8 +78,8 @@ interface BindingExtractor<D> {
     }
 
 
-    static <D, T> SeqBinding<D> makeSeqBinding(Function<D, ? extends ObservableList<? extends T>> extractor,
-                                               Function<? super T, ? extends ObservableValue<String>> renderer) {
+    static <D, T> BindingExtractor<D> makeSeqBinding(Function<D, ? extends ObservableList<? extends T>> extractor,
+                                                     Function<? super T, ? extends ObservableValue<String>> renderer) {
         return d -> LiveList.map(extractor.apply(d), renderer.andThen(Val::wrap));
     }
 
@@ -91,13 +96,6 @@ interface BindingExtractor<D> {
         };
 
         return lift(extractor.andThen(templateMaker));
-    }
-
-
-    /**
-     * Marker interface for sequence bindings.
-     */
-    interface SeqBinding<D> extends BindingExtractor<D> {
     }
 
 

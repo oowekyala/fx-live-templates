@@ -33,7 +33,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
     private final Subscription myCurCtxSubscription;
     private final StringBuffer myStringBuffer;
-    private final EventSource<?> invalidator = new EventSource<>();
+    private final EventSource<?> myInvalidations = new EventSource<>();
     private final List<ReplaceHandler> myUserHandler;
     private final List<ReplaceHandler> myInternalReplaceHandlers;
     private final boolean isInitialized;
@@ -86,7 +86,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
     @Override
     protected Subscription connect() {
-        return invalidator.subscribe(any -> invalidate());
+        return myInvalidations.subscribe(any -> invalidate());
     }
 
 
@@ -95,7 +95,6 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         return myStringBuffer.toString();
     }
     // for construction
-
 
 
     private void handleContentChange(ValIdx valIdx, int start, int end, String value) {
@@ -107,7 +106,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         valIdx.propagateOffsetShift(value.length() - (end - start));
 
         if (isInitialized) {
-            invalidator.push(null);
+            myInvalidations.push(null);
             myUserHandler.forEach(h -> safeHandlerCall(h, start, end, value));
         }
     }
@@ -128,15 +127,15 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
      * Initialises a single Val at the given indices.
      */
     private Subscription initVal(BindingExtractor<D> origin, Val<String> stringSource, int outerIdx, int innerIdx) {
-
         // sequence bindings will call this method when their content has changed
-        // so we must take care of the offsets
 
-        String initialValue = Objects.toString(stringSource.getValue());
-        ValIdx valIdx = insertBindingAt(outerIdx, innerIdx, initialValue.length());
+        // this thing is captured which allows its index to remain up to date
+        ValIdx valIdx = insertBindingAt(outerIdx, innerIdx);
 
+        String initialValue = stringSource.getValue();
         int abs = valIdx.currentAbsoluteOffset();
-        handleContentChange(valIdx, abs, abs , initialValue);
+
+        handleContentChange(valIdx, abs, abs, initialValue == null ? "" : initialValue);
 
         return origin.bindSingleVal(stringSource,
                                     valIdx::currentAbsoluteOffset,
@@ -144,8 +143,6 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
                      // part of the subscription
                      .and(() -> deleteBindingAt(valIdx));
     }
-
-
 
 
     private void deleteBindingAt(ValIdx idx) {
@@ -158,8 +155,8 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     }
 
 
-    private ValIdx insertBindingAt(int outerIdx, int innerIdx, int insertedLength) {
-        ValIdx valIdx = new ValIdx(myOuterOffsets, outerIdx, innerIdx, mySequences.get(outerIdx), insertedLength, !isInitialized);
+    private ValIdx insertBindingAt(int outerIdx, int innerIdx) {
+        ValIdx valIdx = new ValIdx(myOuterOffsets, myStringBuffer, outerIdx, innerIdx, mySequences.get(outerIdx), !isInitialized);
 
         if (!isInitialized) {
             // initialisation pass is special for now
@@ -169,7 +166,6 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
         return valIdx;
     }
-
 
 
     private static void safeHandlerCall(ReplaceHandler h, int start, int end, String value) {

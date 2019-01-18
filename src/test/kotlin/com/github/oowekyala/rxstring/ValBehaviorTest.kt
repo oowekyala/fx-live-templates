@@ -39,7 +39,7 @@ class ValBehaviorTest : FunSpec({
         lt.value shouldBe "Foo[hehe]bar"
 
         dc.name.value = null
-        lt.value shouldBe "Foo[null]bar"
+        lt.value shouldBe "Foo[]bar"
     }
 
 
@@ -96,7 +96,7 @@ class ValBehaviorTest : FunSpec({
         lt.value shouldBe "Foo[MissingOverride]bar"
 
         dc.name.value = null
-        lt.value shouldBe "Foo[null]bar"
+        lt.value shouldBe "Foo[]bar"
         dc.name.value = "FOO"
         lt.value shouldBe "Foo[FOO]bar"
     }
@@ -328,7 +328,61 @@ class ValBehaviorTest : FunSpec({
         val dc = DContext()
         lt.dataContext = dc
 
-        lt.value shouldBe "Foo[null]bar"
+        lt.value shouldBe "Foo[]bar"
+    }
+
+
+    test("Test null subtemplate data context") {
+
+        class SubDContext {
+            val name = Var.newSimpleVar("sub")
+            val num = Var.newSimpleVar(4)
+        }
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+            val sub = Var.newSimpleVar(SubDContext())
+        }
+
+        val lt = LiveTemplate
+                .builder<DContext>()
+                .append("<top name='").bind { it.name }.appendLine("'>")
+                .bindTemplate({ it.sub }) { sub ->
+                    sub.append("<sub name='").bind { it.name }.append("' num='").bind { it.num }.append("'/>")
+                }
+                .endLine()
+                .append("</top>")
+                .toTemplate()
+
+
+        lt.value shouldBe null
+
+        val dc = DContext()
+        lt.dataContext = dc
+
+        lt.value shouldBe """
+            <top name='top'>
+            <sub name='sub' num='4'/>
+            </top>
+        """.trimIndent()
+
+        dc.sub.value = null
+
+        lt.value shouldBe """
+            <top name='top'>
+
+            </top>
+        """.trimIndent()
+
+
+        dc.sub.value = SubDContext()
+
+        lt.value shouldBe """
+            <top name='top'>
+            <sub name='sub' num='4'/>
+            </top>
+        """.trimIndent()
+
     }
 
 })
