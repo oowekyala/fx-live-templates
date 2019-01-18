@@ -155,7 +155,7 @@ class ValBehaviorTest : FunSpec({
     }
 
 
-    test("f:Test seq binding") {
+    test("Test seq binding") {
 
         class DContext {
             val strings: LiveList<String> = LiveArrayList<String>("sub,", "trolo")
@@ -199,6 +199,117 @@ class ValBehaviorTest : FunSpec({
             </top>
         """.trimIndent()
     }
+
+
+
+    test("Test deletion inside seq") {
+
+        class DContext {
+            val strings: LiveList<String> = LiveArrayList<String>("sub,", "trolo")
+        }
+
+        val lt = LiveTemplate
+                .builder<DContext>()
+                .appendLine("<top>")
+                .bindConstSeq { it.strings }
+                .endLine()
+                .append("</top>")
+                .toTemplate()
+
+
+        lt.value shouldBe null
+
+        val dc = DContext()
+        lt.dataContext = dc
+
+        lt.value shouldBe """
+            <top>
+            sub,trolo
+            </top>
+        """.trimIndent()
+
+        lt.dataContext.strings.removeAt(0)
+
+
+        lt.value shouldBe """
+            <top>
+            trolo
+            </top>
+        """.trimIndent()
+
+
+        lt.dataContext.strings += ",olol"
+
+        lt.value shouldBe """
+            <top>
+            trolo,olol
+            </top>
+        """.trimIndent()
+
+    }
+
+
+    test("f:Test insertion inside seq") {
+
+        class DContext {
+            val strings: LiveList<String> = LiveArrayList<String>("sub", ",trolo")
+            val strings2: LiveList<String> = LiveArrayList<String>("a", ",b")
+        }
+
+        val lt = LiveTemplate
+                .builder<DContext>()
+                .appendLine("<top>")
+                .bindConstSeq { it.strings }
+                .endLine()
+                .bindConstSeq { it.strings2 }
+                .endLine()
+                .append("</top>")
+                .toTemplate()
+
+
+        lt.value shouldBe null
+
+        val dc = DContext()
+        lt.dataContext = dc
+
+        lt.value shouldBe """
+            <top>
+            sub,trolo
+            a,b
+            </top>
+        """.trimIndent()
+
+        lt.dataContext.strings.add(1, ",foo")
+
+
+        lt.value shouldBe """
+            <top>
+            sub,foo,trolo
+            a,b
+            </top>
+        """.trimIndent()
+
+
+        lt.dataContext.strings[2] = ",olol"
+
+        lt.value shouldBe """
+            <top>
+            trolo,foo,olol
+            a,b
+            </top>
+        """.trimIndent()
+
+        lt.dataContext.strings2[0]= "c"
+
+        lt.value shouldBe """
+            <top>
+            trolo,foo,olol
+            c,b
+            </top>
+        """.trimIndent()
+
+    }
+
 
 
     test("Test initial null value") {

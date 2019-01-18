@@ -26,13 +26,6 @@ interface BindingExtractor<D> {
     // on pourrait dispatcher mais ballec
     default Subscription bindSingleVal(Val<String> val, Supplier<Integer> absoluteOffset, ReplaceHandler callback) {
 
-        Subscription removalCallback = () -> {
-            // don't forget to remove the text after unbinding to update the offsets & all
-            // TODO that may cause UI twitches, maybe make Subscription.dynamic handle replace events specially?
-            int absolute = absoluteOffset.get();
-            callback.delete(absolute, absolute + val.getValue().length());
-        };
-
         if (val instanceof LiveTemplateImpl) {
 
             LiveTemplateImpl<?> subTemplate = (LiveTemplateImpl<?>) val;
@@ -51,7 +44,7 @@ interface BindingExtractor<D> {
 
             subTemplate.addInternalReplaceHandler(subHandler);
 
-            return removalCallback.and(() -> subTemplate.removeInternalReplaceHandler(subHandler));
+            return () -> subTemplate.removeInternalReplaceHandler(subHandler);
 
 
         } else {
@@ -62,8 +55,7 @@ interface BindingExtractor<D> {
                           int endOffset = startOffset + change.getOldValue().length();
 
                           callback.replace(startOffset, endOffset, change.getNewValue());
-                      })
-                      .and(removalCallback);
+                      });
         }
     }
 
