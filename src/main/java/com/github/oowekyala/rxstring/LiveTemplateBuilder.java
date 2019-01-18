@@ -1,8 +1,13 @@
 package com.github.oowekyala.rxstring;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import org.reactfx.Subscription;
 import org.reactfx.value.Val;
 
 import javafx.beans.value.ObservableValue;
@@ -195,12 +200,55 @@ public interface LiveTemplateBuilder<D> {
 
 
     /**
-     * Builds a new live template ready for use. This builder can still be used
-     * after that.
+     * Builds a new live template ready for use, but with neither data context nor replace handlers.
+     * This builder can still be used after that.
+     *
+     * @return A new live template
+     *
+     * @see #toBoundTemplate(Object, ReplaceHandler...)
+     * @see #toTemplateSubscription(Object, ReplaceHandler, ReplaceHandler...)
+     */
+    LiveTemplate<D> toTemplate();
+
+
+    /**
+     * Builds a new live template already bound to the specified data context.
+     * The handlers are also added. This builder can still be used after that.
+     *
+     * @param dataContext     Object on which to bind
+     * @param replaceHandlers Handlers to add to the returned template
      *
      * @return A new live template
      */
-    LiveTemplate<D> toTemplate();
+    default LiveTemplate<D> toBoundTemplate(D dataContext, ReplaceHandler... replaceHandlers) {
+        LiveTemplate<D> template = toTemplate();
+        for (ReplaceHandler handler : replaceHandlers) {
+            template.addReplaceHandler(handler);
+        }
+        template.setDataContext(dataContext);
+        return template;
+    }
+
+
+    /**
+     * Builds a new live template, binds it to the specified data context and handlers,
+     * and returns a subscription to unbind the template from its data context. This can
+     * only be useful if you plan to only use the replace handlers to affect the external
+     * world, hence why you're supposed to hand-in at least one.
+     *
+     * @param dataContext Object on which to bind
+     * @param hd          First replace handler
+     * @param tl          Rest of the replace handlers
+     *
+     * @return A new live template
+     */
+    default Subscription toTemplateSubscription(D dataContext, ReplaceHandler hd, ReplaceHandler... tl) {
+        List<ReplaceHandler> handlers = new ArrayList<>(tl.length + 1);
+        handlers.add(Objects.requireNonNull(hd));
+        handlers.addAll(Arrays.asList(tl));
+        LiveTemplate<D> template = toBoundTemplate(dataContext, handlers.toArray(new ReplaceHandler[0]));
+        return () -> template.setDataContext(null);
+    }
 
 
     /**
@@ -267,7 +315,8 @@ public interface LiveTemplateBuilder<D> {
 
 
         /**
-         * A value renderer that renders Ts using a nested live template.
+         * A value renderer that renders Ts using a nested live template. This is what {@link LiveTemplateBuilder#bindTemplatedSeq(Function, Consumer)}
+         * and {@link LiveTemplateBuilder#bindTemplate(Function, Consumer)} use under the hood.
          *
          * @param parent             Parent builder, which copies its configuration (like default indent,
          *                           but not its bindings) to the child

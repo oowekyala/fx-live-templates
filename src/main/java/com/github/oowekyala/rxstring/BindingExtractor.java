@@ -53,6 +53,7 @@ interface BindingExtractor<D> {
 
             return () -> {
                 subTemplate.removeInternalReplaceHandler(subHandler);
+                subTemplate.dataContextProperty().unbind();
                 subTemplate.setDataContext(null);
             };
 
@@ -62,8 +63,7 @@ interface BindingExtractor<D> {
                       .changes()
                       .subscribe(change -> {
                           int startOffset = absoluteOffset.get();
-                          int endOffset = startOffset + change.getOldValue().length();
-                          callback.replace(startOffset, endOffset, change.getNewValue());
+                          int endOffset = startOffset + change.getOldValue().length();callback.replace(startOffset, endOffset, change.getNewValue());
                       });
         }
     }

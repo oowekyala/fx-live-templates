@@ -155,6 +155,48 @@ class ValBehaviorTest : FunSpec({
     }
 
 
+
+
+    test("Test destruction") {
+
+        class SubDContext {
+            val name = Var.newSimpleVar("sub")
+            val num = Var.newSimpleVar(4)
+        }
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+            val sub = Var.newSimpleVar(SubDContext())
+        }
+
+        val lt = LiveTemplate
+                .builder<DContext>()
+                .append("<top name='").bind { it.name }.appendLine("'>")
+                .bindTemplate({ it.sub }) { sub ->
+                    sub.append("<sub name='").bind { it.name }.append("' num='").bind { it.num }.append("'/>")
+                }
+                .endLine()
+                .append("</top>")
+                .toTemplate()
+
+
+        lt.value shouldBe null
+
+        val dc = DContext()
+        lt.dataContext = dc
+
+        lt.value shouldBe """
+            <top name='top'>
+            <sub name='sub' num='4'/>
+            </top>
+        """.trimIndent()
+
+        lt.dataContext = null
+
+        lt.isEmpty shouldBe true
+    }
+
+
     test("Test seq binding") {
 
         class DContext {
