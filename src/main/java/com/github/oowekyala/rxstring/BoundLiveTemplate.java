@@ -20,7 +20,7 @@ import org.reactfx.value.ValBase;
  * @author Clément Fournier
  * @since 1.0
  */
-class BoundLiveTemplate<D> extends ValBase<String> {
+final class BoundLiveTemplate<D> extends ValBase<String> {
 
     // Represents the offsets of each outer binding
     private final int[] myOuterOffsets;
@@ -33,6 +33,7 @@ class BoundLiveTemplate<D> extends ValBase<String> {
     private final EventSource<?> invalidator = new EventSource<>();
     private final List<ReplaceHandler> myUserHandler;
     private final List<ReplaceHandler> myInternalReplaceHandlers;
+    private final boolean isInitialized;
 
 
     BoundLiveTemplate(D dataContext,
@@ -55,6 +56,7 @@ class BoundLiveTemplate<D> extends ValBase<String> {
             );
         }
 
+        this.isInitialized = true;
         this.myCurCtxSubscription = subscription;
         this.myUserHandler = userReplaceHandler;
         this.myInternalReplaceHandlers = internalReplaceHandlers;
@@ -141,9 +143,16 @@ class BoundLiveTemplate<D> extends ValBase<String> {
      * Initialises a single Val at the given indices.
      */
     private Subscription initVal(BindingExtractor<D> origin, Val<String> stringSource, int outerIdx, int innerIdx) {
-
+        // sequence bindings will call this method when their content has changed
+        // so we must take care of the offsets
         String initialValue = Objects.toString(stringSource.getValue());
-        myStringBuffer.append(initialValue);
+        if (!isInitialized) {
+            mySequenceOffsets.get(outerIdx).set(innerIdx, myStringBuffer.length() - myOuterOffsets[outerIdx]);
+        } else {
+            insertBindingAt(outerIdx, innerIdx, initialValue.length());
+        }
+
+        myStringBuffer.insert(absoluteOffset(outerIdx, innerIdx), initialValue);
 
         return origin.bindSingleVal(stringSource,
                                     () -> absoluteOffset(outerIdx, innerIdx),
@@ -153,6 +162,51 @@ class BoundLiveTemplate<D> extends ValBase<String> {
 
     private int absoluteOffset(int outerIdx, int innerIdx) {
         return myOuterOffsets[outerIdx] + mySequenceOffsets.get(outerIdx).get(innerIdx);
+    }
+
+
+    private void insertBindingAt(int outerIdx, int innerIdx, int insertedLength) {
+
+        List<Integer> seq = mySequenceOffsets.get(outerIdx);
+
+        // length difference between prev and current to propagate right
+        int diff;
+        if (innerIdx >= seq.size()) {
+            assert innerIdx == seq.size();
+            if (innerIdx == 0) {
+                seq.add(0);
+            } else {
+                // offset of prev + size of prev
+                seq.add(seq.get(innerIdx - 1) + sizeOf(outerIdx, innerIdx - 1));
+            }
+            diff = insertedLength;
+        } else {
+            diff = sizeOf(outerIdx, innerIdx) - insertedLength;
+        }
+
+        propagateOffsetChange(outerIdx, innerIdx, diff);
+    }
+
+
+    /** Gets the size in characters of the sequence element at the specified position. */
+    private int sizeOf(int outerIdx, int innerIdx) {
+
+        List<Integer> seq = mySequenceOffsets.get(outerIdx);
+
+        assert innerIdx < seq.size();
+
+        int res;
+        if (innerIdx < seq.size() - 1) {
+            // not the last
+            res = seq.get(innerIdx + 1) - seq.get(innerIdx);
+        } else {
+            assert outerIdx + 1 < myOuterOffsets.length;
+
+            res = myOuterOffsets[outerIdx + 1] - seq.get(innerIdx);
+        }
+
+        assert res >= 0;
+        return res;
     }
 
     private static void safeHandlerCall(ReplaceHandler h, int start, int end, String value) {

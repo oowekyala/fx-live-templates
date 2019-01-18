@@ -26,6 +26,13 @@ interface BindingExtractor<D> {
     // on pourrait dispatcher mais ballec
     default Subscription bindSingleVal(Val<String> val, Supplier<Integer> absoluteOffset, ReplaceHandler callback) {
 
+        Subscription removalCallback = () -> {
+            // don't forget to remove the text after unbinding to update the offsets & all
+            // TODO that may cause UI twitches, maybe make Subscription.dynamic handle replace events specially?
+            int absolute = absoluteOffset.get();
+            callback.delete(absolute, absolute + val.getValue().length());
+        };
+
         if (val instanceof LiveTemplateImpl) {
 
             LiveTemplateImpl<?> subTemplate = (LiveTemplateImpl<?>) val;
@@ -44,7 +51,7 @@ interface BindingExtractor<D> {
 
             subTemplate.addInternalReplaceHandler(subHandler);
 
-            return () -> subTemplate.removeInternalReplaceHandler(subHandler);
+            return removalCallback.and(() -> subTemplate.removeInternalReplaceHandler(subHandler));
 
 
         } else {
@@ -55,7 +62,8 @@ interface BindingExtractor<D> {
                           int endOffset = startOffset + change.getOldValue().length();
 
                           callback.replace(startOffset, endOffset, change.getNewValue());
-                      });
+                      })
+                      .and(removalCallback);
         }
     }
 
@@ -70,8 +78,9 @@ interface BindingExtractor<D> {
     }
 
 
-    static <D, T> BindingExtractor<D> makeSeqBinding(Function<D, ? extends ObservableList<T>> extractor, Function<? super T, Val<String>> renderer) {
-        return d -> LiveList.map(extractor.apply(d), renderer);
+    static <D, T> SeqBinding<D> makeSeqBinding(Function<D, ? extends ObservableList<? extends T>> extractor,
+                                               Function<? super T, ? extends ObservableValue<String>> renderer) {
+        return d -> LiveList.map(extractor.apply(d), renderer.andThen(Val::wrap));
     }
 
 
@@ -91,6 +100,13 @@ interface BindingExtractor<D> {
 
 
     /**
+     * Marker interface for sequence bindings.
+     */
+    interface SeqBinding<D> extends BindingExtractor<D> {
+    }
+
+
+    /**
      * Represents a constant binding. Distinct from the others because it allows
      * to compact them in the {@link LiveTemplateBuilderImpl}.
      *
@@ -100,7 +116,7 @@ interface BindingExtractor<D> {
         final String constant;
 
 
-        ConstantBinding(String constant) {
+        private ConstantBinding(String constant) {
             this.constant = constant;
         }
 

@@ -11,6 +11,7 @@ import org.reactfx.value.Val;
 
 import com.github.oowekyala.rxstring.BindingExtractor.ConstantBinding;
 import javafx.beans.value.ObservableValue;
+import javafx.collections.ObservableList;
 
 
 /**
@@ -39,9 +40,9 @@ class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
         if (myBindings.size() > 0 && myBindings.get(myBindings.size() - 1) instanceof ConstantBinding) {
             // merge consecutive constants
             ConstantBinding binding = (ConstantBinding) myBindings.remove(myBindings.size() - 1);
-            myBindings.add(new ConstantBinding<>(binding.constant + string));
+            myBindings.add(BindingExtractor.makeConstant(binding.constant + string));
         } else {
-            myBindings.add(new ConstantBinding<>(string));
+            myBindings.add(BindingExtractor.makeConstant(string));
         }
         return this;
     }
@@ -58,6 +59,13 @@ class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
     public <T> LiveTemplateBuilder<D> bindTemplate(Function<? super D, ? extends ObservableValue<T>> extractor,
                                                    Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
         myBindings.add(BindingExtractor.makeTemplateBinding(extractor, subTemplateBuilder));
+        return this;
+    }
+
+
+    @Override
+    public <T> LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<? extends T>> extractor, Function<? super T, ? extends ObservableValue<String>> renderer) {
+        myBindings.add(BindingExtractor.makeSeqBinding(extractor, renderer));
         return this;
     }
 

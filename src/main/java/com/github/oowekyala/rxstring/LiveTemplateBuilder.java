@@ -4,7 +4,10 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import org.reactfx.value.Val;
+
 import javafx.beans.value.ObservableValue;
+import javafx.collections.ObservableList;
 
 
 /**
@@ -92,6 +95,36 @@ public interface LiveTemplateBuilder<D> {
     <T> LiveTemplateBuilder<D> bindTemplate(Function<? super D, ? extends ObservableValue<T>> extractor,
                                             Consumer<LiveTemplateBuilder<T>> subTemplateBuilder);
 
+
+    <T> LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<? extends T>> extractor,
+                                       Function<? super T, ? extends ObservableValue<String>> renderer);
+
+
+    default <T> LiveTemplateBuilder<D> bindConstSeq(Function<D, ? extends ObservableList<? extends T>> extractor,
+                                                    Function<? super T, String> renderer) {
+        return bindSeq(extractor, renderer.andThen(Val::constant));
+    }
+
+
+    default LiveTemplateBuilder<D> bindConstSeq(Function<D, ? extends ObservableList<String>> extractor) {
+        return bindConstSeq(extractor, Function.identity());
+    }
+
+
+    default LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<? extends ObservableValue<String>>> extractor) {
+        return this.bindSeq(extractor, Function.identity());
+    }
+
+    interface SeqRenderer {
+        // TODO to avoid overloads
+
+
+
+
+
+
+
+    }
 
     /**
      * Returns a new builder that has all the current state of this builder.

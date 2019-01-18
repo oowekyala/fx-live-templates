@@ -2,6 +2,8 @@ package com.github.oowekyala.rxstring
 
 import io.kotlintest.shouldBe
 import io.kotlintest.specs.FunSpec
+import org.reactfx.collection.LiveArrayList
+import org.reactfx.collection.LiveList
 import org.reactfx.value.Var
 
 /**
@@ -151,6 +153,53 @@ class ValBehaviorTest : FunSpec({
             </top>
         """.trimIndent()
     }
+
+
+    test("f:Test seq binding") {
+
+        class DContext {
+            val strings: LiveList<String> = LiveArrayList<String>("sub,", "trolo")
+        }
+
+        val lt = LiveTemplate
+                .builder<DContext>()
+                .appendLine("<top>")
+                .bindConstSeq { it.strings }
+                .endLine()
+                .append("</top>")
+                .toTemplate()
+
+
+        lt.value shouldBe null
+
+        val dc = DContext()
+        lt.dataContext = dc
+
+        lt.value shouldBe """
+            <top>
+            sub,trolo
+            </top>
+        """.trimIndent()
+
+        lt.dataContext.strings[0] = "hy,"
+
+
+        lt.value shouldBe """
+            <top>
+            hy,trolo
+            </top>
+        """.trimIndent()
+
+
+        lt.dataContext.strings += ",olol"
+
+        lt.value shouldBe """
+            <top>
+            hy,trolo,olol
+            </top>
+        """.trimIndent()
+    }
+
 
     test("Test initial null value") {
         class DContext {
