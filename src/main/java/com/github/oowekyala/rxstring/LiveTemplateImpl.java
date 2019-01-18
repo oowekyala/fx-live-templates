@@ -35,6 +35,7 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
 
             if (!myCurBound.isEmpty()) {
                 myCurBound.getValue().unbind();
+                // cannot be null?
                 myCurBound.setValue(null);
             }
 
@@ -43,7 +44,7 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
             }
         });
 
-        myDelegateStringVal = myCurBound.flatMap(Function.identity());
+        myDelegateStringVal = myCurBound.filter(Objects::nonNull).flatMap(Function.identity());
     }
 
 

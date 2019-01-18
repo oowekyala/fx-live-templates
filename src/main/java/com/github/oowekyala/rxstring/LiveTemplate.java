@@ -10,7 +10,8 @@ import org.reactfx.value.Var;
  * A {@link Val}&lt;String&gt; that binds to the properties of an object and reacts their changes.
  * You can build one with a {@link LiveTemplateBuilder}, see {@link LiveTemplate#builder()}.
  *
- * TODO Edition of optional attributes/elements -> find a way to add and remove parts of the template cleanly
+ * TODO Streamline edition of optional attributes/elements
+ * TODO make lazy
  *
  * @param <D> Type of data context this template can be bound to
  *
@@ -39,7 +40,7 @@ public interface LiveTemplate<D> extends Val<String> {
      * Rebinds this template to the given data context. If null, then
      * just unbinds the current data context, if any, and sets this
      * value to empty. The {@linkplain #addReplaceHandler(ReplaceHandler) replacement handlers}
-     * are not called when unbinding.
+     * are also called when unbinding to perform deletions.
      *
      * @param context The new data context
      *

@@ -341,7 +341,7 @@ class ValBehaviorTest : FunSpec({
             </top>
         """.trimIndent()
 
-        lt.dataContext.strings2[0]= "c"
+        lt.dataContext.strings2[0] = "c"
 
         lt.value shouldBe """
             <top>
@@ -427,4 +427,30 @@ class ValBehaviorTest : FunSpec({
 
     }
 
+    test("Test observing events") {
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+        }
+
+        val lt = LiveTemplate
+                .builder<DContext>()
+                .append("<top name='").bind { it.name }.appendLine("'>")
+                .toTemplate()
+
+
+        lt.value shouldBe null
+
+        val dc = DContext()
+        lt.dataContext = dc
+
+        val vals = mutableListOf<Int>()
+        lt.map { it.length }.values().subscribe { vals.add(it) }
+
+        dc.name.value = null
+        dc.name.value = "gaspar"
+
+        vals shouldBe listOf(17, 14, 20)
+
+    }
 })
