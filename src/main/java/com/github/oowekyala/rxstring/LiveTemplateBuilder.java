@@ -1,6 +1,5 @@
 package com.github.oowekyala.rxstring;
 
-import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -134,6 +133,7 @@ public interface LiveTemplateBuilder<D> {
      * @param extractor          Extracts an observable value representing the
      *                           data context of the sub-template
      * @param subTemplateBuilder A function side-effecting on the builder of the sub-template
+     *                           to configure it
      * @param <T>                Type of the data context for the sub-template
      *
      * @return This builder
@@ -165,17 +165,20 @@ public interface LiveTemplateBuilder<D> {
 
     /**
      * Binds a property of the data context that returns an observable list of items,
-     * that are rendered with {@link ValueRenderer#templated(Consumer)}.
+     * that are rendered with {@link ValueRenderer#templated(Consumer)}. The sub template
+     * builder inherits the configuration of this builder (like the {@linkplain #withDefaultIndent(String)
+     * default indentation}).
      *
      * @param extractor          Value extractor
      * @param subTemplateBuilder A function side-effecting on the builder of the sub-template
+     *                           to configure it
      * @param <T>                Type of items of the list
      *
      * @return This builder
      */
     default <T> LiveTemplateBuilder<D> bindTemplatedSeq(Function<D, ? extends ObservableList<? extends T>> extractor,
                                                         Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
-        return bindSeq(ValueRenderer.templated(subTemplateBuilder), extractor);
+        return bindSeq(ValueRenderer.templated(this, subTemplateBuilder), extractor);
     }
 
 
@@ -189,12 +192,6 @@ public interface LiveTemplateBuilder<D> {
     default LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<String>> extractor) {
         return bindSeq(ValueRenderer.identity(), extractor);
     }
-
-
-    /**
-     * Returns a new builder that has all the current state of this builder.
-     */
-    LiveTemplateBuilder<D> copy();
 
 
     /**
@@ -214,34 +211,82 @@ public interface LiveTemplateBuilder<D> {
      */
     interface ValueRenderer<T> extends Function<T, ObservableValue<String>> {
 
-
+        /**
+         * A value renderer for anything, that maps it to string using
+         * {@link Object#toString()}. When the value is null, the empty
+         * string is used instead of the string "null".
+         *
+         * @param <T> Any reference type
+         */
         static <T> ValueRenderer<T> asString() {
-            return asString(Objects::toString);
+            return asString(Object::toString);
         }
 
 
+        /**
+         * A value renderer that maps Ts to string using the provided mapping.
+         *
+         * @param f   Mapper from T to String
+         * @param <T> Type of values this renderer can handle
+         */
         static <T> ValueRenderer<T> asString(Function<? super T, String> f) {
             return f.andThen(Val::constant)::apply;
         }
 
 
+        /**
+         * A value renderer that renders ObservableValues&lt;String&gt; to
+         * their current value.
+         */
         static ValueRenderer<? extends ObservableValue<String>> selfValue() {
             return obs -> Val.map(obs, Function.identity());
         }
 
 
+        /**
+         * A trivial value renderer for strings.
+         */
         static ValueRenderer<String> identity() {
             return asString(Function.identity());
         }
 
 
+        /**
+         * A value renderer that renders Ts using a nested live template. The builder for the
+         * nested template starts with a fresh configuration.
+         *
+         * @param subTemplateBuilder A function side-effecting on the builder of the sub-template
+         *                           to configure it
+         * @param <T>                Type of values to render
+         *
+         * @return A value renderer for Ts
+         */
         static <T> ValueRenderer<T> templated(Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
-            LiveTemplateBuilder<T> builder = LiveTemplate.builder();
-            subTemplateBuilder.accept(builder);
+            return templated(null, subTemplateBuilder);
+        }
+
+
+        /**
+         * A value renderer that renders Ts using a nested live template.
+         *
+         * @param parent             Parent builder, which copies its configuration (like default indent,
+         *                           but not its bindings) to the child
+         * @param subTemplateBuilder A function side-effecting on the builder of the sub-template
+         *                           to configure it
+         * @param <T>                Type of values to render
+         *
+         * @return A value renderer for Ts
+         */
+        static <T> ValueRenderer<T> templated(LiveTemplateBuilder<?> parent, Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
+            LiveTemplateBuilder<T> childBuilder =
+                parent == null ? LiveTemplate.builder()
+                               : ((LiveTemplateBuilderImpl) parent).spawnChildWithSameConfig();
+
+            subTemplateBuilder.accept(childBuilder);
             // create a single builder that will spawn several templates
 
             return t -> {
-                LiveTemplate<T> template = builder.toTemplate();
+                LiveTemplate<T> template = childBuilder.toTemplate();
                 template.setDataContext(t);
                 return template;
             };

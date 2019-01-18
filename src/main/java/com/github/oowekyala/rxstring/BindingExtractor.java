@@ -1,6 +1,5 @@
 package com.github.oowekyala.rxstring;
 
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
@@ -87,17 +86,15 @@ interface BindingExtractor<D> {
 
 
     static <D, Sub> BindingExtractor<D> makeTemplateBinding(Function<? super D, ? extends ObservableValue<Sub>> extractor,
-                                                            Consumer<LiveTemplateBuilder<Sub>> subTemplateBuilder) {
+                                                            LiveTemplateBuilder<Sub> subTemplateBuilder) {
 
         // only build the template once
-        LiveTemplateBuilder<Sub> builder = LiveTemplate.builder();
-        subTemplateBuilder.accept(builder);
-        LiveTemplate<Sub> template = builder.toTemplate();
+        LiveTemplate<Sub> subTemplate = subTemplateBuilder.toTemplate();
 
         Function<ObservableValue<Sub>, LiveTemplate<Sub>> templateMaker = obsT -> {
-            template.dataContextProperty().unbind();
-            template.dataContextProperty().bind(obsT);
-            return template;
+            subTemplate.dataContextProperty().unbind();
+            subTemplate.dataContextProperty().bind(obsT);
+            return subTemplate;
         };
 
         return lift(extractor.andThen(templateMaker));

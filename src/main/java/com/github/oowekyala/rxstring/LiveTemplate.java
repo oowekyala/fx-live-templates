@@ -10,6 +10,8 @@ import org.reactfx.value.Var;
  * A {@link Val}&lt;String&gt; that binds to the properties of an object and reacts their changes.
  * You can build one with a {@link LiveTemplateBuilder}, see {@link LiveTemplate#builder()}.
  *
+ * TODO Edition of optional attributes/elements -> find a way to add and remove parts of the template cleanly
+ *
  * @param <D> Type of data context this template can be bound to
  *
  * @author Clément Fournier

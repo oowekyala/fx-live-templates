@@ -23,16 +23,27 @@ class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
     // TODO everything could be mapped to seqs here and support low-level delimiting logic
 
     private final List<BindingExtractor<D>> myBindings;
-    private String myDefaultIndent = "    ";
+    private final InheritableConfig myInheritableConfig;
 
 
-    private LiveTemplateBuilderImpl(List<BindingExtractor<D>> bindings) {
+    private LiveTemplateBuilderImpl(List<BindingExtractor<D>> bindings, InheritableConfig baseConfig) {
         this.myBindings = new ArrayList<>(bindings);
+        this.myInheritableConfig = new InheritableConfig(baseConfig);
     }
 
 
     LiveTemplateBuilderImpl() {
-        this(Collections.emptyList());
+        this(Collections.emptyList(), new InheritableConfig());
+    }
+
+
+    private LiveTemplateBuilderImpl(InheritableConfig baseConfig) {
+        this(Collections.emptyList(), baseConfig);
+    }
+
+
+    <T> LiveTemplateBuilder<T> spawnChildWithSameConfig() {
+        return new LiveTemplateBuilderImpl<>(this.myInheritableConfig);
     }
 
 
@@ -53,13 +64,13 @@ class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
 
     @Override
     public LiveTemplateBuilder<D> appendIndent(int level) {
-        return appendIndent(level, myDefaultIndent);
+        return appendIndent(level, myInheritableConfig.defaultIndent);
     }
 
 
     @Override
     public LiveTemplateBuilder<D> withDefaultIndent(String indentStyle) {
-        myDefaultIndent = Objects.requireNonNull(indentStyle);
+        myInheritableConfig.defaultIndent = Objects.requireNonNull(indentStyle);
         return this;
     }
 
@@ -74,7 +85,11 @@ class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
     @Override
     public <T> LiveTemplateBuilder<D> bindTemplate(Function<? super D, ? extends ObservableValue<T>> extractor,
                                                    Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
-        myBindings.add(BindingExtractor.makeTemplateBinding(extractor, subTemplateBuilder));
+
+        LiveTemplateBuilder<T> builder = spawnChildWithSameConfig();
+        subTemplateBuilder.accept(builder);
+
+        myBindings.add(BindingExtractor.makeTemplateBinding(extractor, builder));
         return this;
     }
 
@@ -87,14 +102,24 @@ class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
 
 
     @Override
-    public LiveTemplateBuilder<D> copy() {
-        return new LiveTemplateBuilderImpl<>(myBindings);
+    public LiveTemplate<D> toTemplate() {
+        return new LiveTemplateImpl<>(myBindings);
     }
 
 
-    @Override
-    public LiveTemplate<D> toTemplate() {
-        return new LiveTemplateImpl<>(myBindings);
+    private static class InheritableConfig {
+        String defaultIndent = "    ";
+
+
+        /** Default config. */
+        InheritableConfig() {
+        }
+
+
+        /** Copy constructor. */
+        InheritableConfig(InheritableConfig toCopy) {
+            this.defaultIndent = toCopy.defaultIndent;
+        }
     }
 
 }
