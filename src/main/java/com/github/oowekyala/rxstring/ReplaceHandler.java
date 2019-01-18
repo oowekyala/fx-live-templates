@@ -1,9 +1,11 @@
 package com.github.oowekyala.rxstring;
 
 /**
- * Callback handling text replacement in an external model.
+ * Callback handling text replacement events.
+ * Only replace will be called by this framework.
  *
  * @author Clément Fournier
+ * @since 1.0
  */
 @FunctionalInterface
 public interface ReplaceHandler {

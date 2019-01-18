@@ -5,12 +5,12 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.github.oowekyala</groupId>
-    <artifactId>reactive-string</artifactId>
+    <artifactId>fx-live-templates</artifactId>
     <version>1.0-SNAPSHOT</version>
 
-    <name>reactive-string</name>
-    <!-- FIXME change it to the project's website -->
-    <url>http://www.example.com</url>
+    <name>JavaFX Live Templates</name>
+    <description>A simple framework to present data as a string with data binding</description>
+    <url>http://github.com/oowekyala/fx-live-templates</url>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
