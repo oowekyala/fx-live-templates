@@ -94,4 +94,83 @@ class LiveTemplateBuilderTest : FunSpec({
 
     }
 
+
+    test("Test escape function inheritance with bind and bindTemplatedSeq") {
+        class SubDContext(n: String = "sub", num: Int = 4) {
+            val name = Var.newSimpleVar(n)
+            val num = Var.newSimpleVar(num)
+        }
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+            val sub = LiveArrayList(SubDContext())
+        }
+
+        val lt =
+                LiveTemplate.builder<DContext>()
+                        .withDefaultEscape { s -> "@$s@" }
+                        .append("<top name='").bind { it.name }.appendLine("'>")
+                        .bindTemplatedSeq({ it.sub }) { sub ->
+                            sub.append("<sub name='").bind { it.name }.append("' num='").bind { it.num }.appendLine("'/>")
+                        }
+                        .append("</top>")
+                        .toBoundTemplate(DContext())
+
+        lt.value shouldBe """
+            <top name='@top@'>
+            <sub name='@sub@' num='@4@'/>
+            </top>
+        """.trimIndent()
+
+        lt.dataContext.sub.add(SubDContext("foo", 6))
+
+        lt.value shouldBe """
+            <top name='@top@'>
+            <sub name='@sub@' num='@4@'/>
+            <sub name='@foo@' num='@6@'/>
+            </top>
+        """.trimIndent()
+
+    }
+
+
+
+    test("Test escape function inheritance with bind and bindTemplate") {
+        class SubDContext {
+            val name = Var.newSimpleVar("sub")
+            val num = Var.newSimpleVar(4)
+        }
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+            val sub = Var.newSimpleVar(SubDContext())
+        }
+
+        val lt =
+                LiveTemplate.builder<DContext>()
+                        .withDefaultEscape { "@$it@" }
+                        .append("<top name='").bind { it.name }.appendLine("'>")
+                        .bindTemplate({ it.sub }) { sub ->
+                            sub.append("<sub name='").bind { it.name }.append("' num='").bind { it.num }.append("'/>")
+                        }
+                        .endLine()
+                        .append("</top>")
+                        .toBoundTemplate(DContext())
+
+        lt.value shouldBe """
+            <top name='@top@'>
+            <sub name='@sub@' num='@4@'/>
+            </top>
+        """.trimIndent()
+
+        lt.dataContext.sub.value.name.value = "foo"
+
+        lt.value shouldBe """
+            <top name='@top@'>
+            <sub name='@foo@' num='@4@'/>
+            </top>
+        """.trimIndent()
+
+    }
+
 })

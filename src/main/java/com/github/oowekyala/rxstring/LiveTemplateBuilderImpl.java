@@ -65,8 +65,21 @@ final class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
 
 
     @Override
+    public Function<String, String> getDefaultEscapeFunction() {
+        return myInheritableConfig.escapeFun;
+    }
+
+
+    @Override
     public LiveTemplateBuilder<D> withDefaultIndent(String indentStyle) {
         myInheritableConfig.defaultIndent = Objects.requireNonNull(indentStyle);
+        return this;
+    }
+
+
+    @Override
+    public LiveTemplateBuilder<D> withDefaultEscape(Function<String, String> stringEscapeFunction) {
+        myInheritableConfig.escapeFun = Objects.requireNonNull(stringEscapeFunction);
         return this;
     }
 
@@ -86,6 +99,7 @@ final class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
 
     private static class InheritableConfig {
         String defaultIndent = "    ";
+        Function<String, String> escapeFun = Function.identity();
 
 
         /** Default config. */
@@ -96,6 +110,7 @@ final class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
         /** Copy constructor. */
         InheritableConfig(InheritableConfig toCopy) {
             this.defaultIndent = toCopy.defaultIndent;
+            this.escapeFun = toCopy.escapeFun;
         }
     }
 

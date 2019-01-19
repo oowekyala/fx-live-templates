@@ -50,9 +50,10 @@ import javafx.collections.ObservableList;
  * but allow using shorthands during the construction process. These are
  * <ul>
  * <li>{@linkplain #withDefaultIndent(String) the default indentation}</li>
- * <li>TODO default string escape</li>
+ * <li>{@linkplain #withDefaultEscape(Function) the default escape function}</li>
  * </ul>
- * The sub-templates specified with {@link #bindTemplate(Function, Consumer)} also inherit these properties.
+ * The sub-templates specified with {@link #bindTemplate(Function, Consumer)} and {@link #bindTemplatedSeq(Function, Consumer)}
+ * also inherit these properties.
  *
  * @author Clément Fournier
  * @since 1.0
@@ -69,7 +70,7 @@ public interface LiveTemplateBuilder<D> {
      *
      * @return This builder
      *
-     * @throws NullPointerException if the identStyle is null
+     * @throws NullPointerException if the indentStyle is null
      */
     LiveTemplateBuilder<D> withDefaultIndent(String indentStyle);
 
@@ -80,7 +81,34 @@ public interface LiveTemplateBuilder<D> {
      */
     String getDefaultIndent();
 
-    // constant binding
+
+    /**
+     * Sets the post-processing function that will be applied as the last step of
+     * all data-to-string conversions. This is useful e.g. if you're building a
+     * template for an XML document, and would like to specify that all conversion
+     * functions must be escaped for XML. The default is just the identity function.
+     *
+     * <p>Note: the escape function is not applied to whole {@linkplain #bindTemplate(Function, Consumer) sub-templates},
+     * but is passed on to their builder and applied to their own {@linkplain #bind(Function, ValueRenderer) bind calls}
+     * unless replaced. The escape function also doesn't apply to {@linkplain #append(String) string constants}
+     * and sequence bindings that use the overload {@link #bindSeq(SeqRenderer, Function)}.
+     *
+     * @param stringEscapeFunction String escape function
+     *
+     * @return This builder
+     *
+     * @throws NullPointerException if the argument is null
+     */
+    LiveTemplateBuilder<D> withDefaultEscape(Function<String, String> stringEscapeFunction);
+
+
+    /**
+     * Returns the default escape function, specified by
+     * {@link #withDefaultEscape(Function)}.
+     */
+    Function<String, String> getDefaultEscapeFunction();
+
+    // string constants
 
 
     /**
@@ -170,7 +198,9 @@ public interface LiveTemplateBuilder<D> {
      * @see #bindSeq(SeqRenderer, Function)
      * @see #bind(Function, ValueRenderer)
      */
+    // escapes
     default <T> LiveTemplateBuilder<D> render(Function<? super D, ? extends T> extractor, ValueRenderer<T> renderer) {
+        // note: don't use the bindSeq with ValueRenderer here as it escapes the content
         return bindSeq(renderer, extractor.andThen(LiveArrayList<T>::new)::apply);
     }
 
@@ -185,6 +215,7 @@ public interface LiveTemplateBuilder<D> {
      *
      * @see #bind(Function, ValueRenderer)
      */
+    // escapes
     default <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<T>> extractor) {
         return bind(extractor, ValueRenderer.asString());
     }
@@ -204,8 +235,29 @@ public interface LiveTemplateBuilder<D> {
      * @see #bindSeq(SeqRenderer, Function)
      * @see #render(Function, ValueRenderer)
      */
+    // escapes
     default <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<T>> extractor, ValueRenderer<T> renderer) {
         return render(extractor, renderer.lift());
+    }
+
+
+    /**
+     * Binds a property of the data context to be rendered with the given string conversion
+     * function. If the conversion function returns null, then the empty string will be used
+     * instead.
+     *
+     * @param extractor Extracts the observable value to render from the data context
+     * @param renderer  An object specifying how the value should be converted to a string
+     *
+     * @return This builder
+     *
+     * @see #bindTemplate(Function, Consumer)
+     * @see #bindSeq(SeqRenderer, Function)
+     * @see #render(Function, ValueRenderer)
+     */
+    // escapes
+    default <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<T>> extractor, Function<T, String> renderer) {
+        return bind(extractor, ValueRenderer.asString(renderer));
     }
 
 
@@ -230,6 +282,7 @@ public interface LiveTemplateBuilder<D> {
      *
      * @see #bind(Function, ValueRenderer)
      */
+    // doesn't escape
     default <T> LiveTemplateBuilder<D> bindTemplate(Function<? super D, ? extends ObservableValue<T>> extractor,
                                                     Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
         return bind(extractor, ValueRenderer.templated(this, subTemplateBuilder));
@@ -239,13 +292,11 @@ public interface LiveTemplateBuilder<D> {
     /**
      * Binds a property of the data context that returns an observable list of items.
      * The list will be mapped to a list of strings with the with the specified {@link SeqRenderer}.
-     * Most of the time you'll want to use {@link #bindSeq(ValueRenderer, Function)}.
+     * Most of the time you'll want to use {@link #bindSeq(ValueRenderer, Function)},
+     * this overload is mostly there for code organisation.
      *
-     * <p>Changes in individual items of the list are reflected in the value of the template.
-     * Only minimal changes are pushed: items are rendered incrementally (ie the whole list
-     * is not rendered every time there's a change in one item). If the renderer function
-     * itself produces live templates, then the minimal changes from that template will be
-     * forwarded, so the changes will be even finer.
+     * <p>Note: the {@linkplain #withDefaultEscape(Function) default escape function}
+     * is not applied to the items of this list.
      *
      * FIXME this doesn't play well with JavaFX's native ListProperty because it fires too many events
      *
@@ -258,6 +309,7 @@ public interface LiveTemplateBuilder<D> {
      * @see #bindSeq(ValueRenderer, Function)
      * @see #bindTemplatedSeq(Function, Consumer)
      */
+    // doesn't escape
     <T> LiveTemplateBuilder<D> bindSeq(SeqRenderer<? super T> renderer,
                                        Function<D, ? extends ObservableList<? extends T>> extractor);
 
@@ -266,17 +318,22 @@ public interface LiveTemplateBuilder<D> {
      * Binds a property of the data context that returns an observable list of items.
      * Each item will be mapped to a string using the specified {@link ValueRenderer}.
      *
+     * <p>Changes in individual items of the list are reflected in the value of the template.
+     * Only minimal changes are pushed: items are rendered incrementally (ie the whole list
+     * is not rendered every time there's a change in one item). If the renderer function
+     * itself produces live templates, then the minimal changes from that template will be
+     * forwarded, so the changes will be even finer.
+     *
      * @param renderer  Renderer function for items
      * @param extractor List extractor
      * @param <T>       Type of items of the list
      *
      * @return This builder
-     *
-     * @see #bindSeq(SeqRenderer, Function)
      */
+    // escapes
     default <T> LiveTemplateBuilder<D> bindSeq(ValueRenderer<? super T> renderer,
                                                Function<D, ? extends ObservableList<? extends T>> extractor) {
-        return bindSeq(renderer.toSeq(), extractor);
+        return bindSeq(renderer.escapeWith(getDefaultEscapeFunction()).toSeq(), extractor);
     }
 
 
@@ -293,9 +350,11 @@ public interface LiveTemplateBuilder<D> {
      *
      * @return This builder
      */
+    // doesn't escape
     default <T> LiveTemplateBuilder<D> bindTemplatedSeq(Function<D, ? extends ObservableList<? extends T>> extractor,
                                                         Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
-        return bindSeq(ValueRenderer.templated(this, subTemplateBuilder), extractor);
+        // note: don't use the bindSeq with ValueRenderer here as it escapes the content
+        return bindSeq(ValueRenderer.templated(this, subTemplateBuilder).toSeq(), extractor);
     }
 
 
@@ -306,6 +365,7 @@ public interface LiveTemplateBuilder<D> {
      *
      * @return This builder
      */
+    // escapes
     default LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<String>> extractor) {
         return bindSeq(ValueRenderer.identity(), extractor);
     }
@@ -404,6 +464,19 @@ public interface LiveTemplateBuilder<D> {
 
 
         /**
+         * Applies the given escape function after this one. {@linkplain #templated(LiveTemplateBuilder, Consumer) Sub-template renderers}
+         * are unchanged.
+         *
+         * @param escapeFun Escape function
+         *
+         * @return A new renderer
+         */
+        default ValueRenderer<T> escapeWith(Function<String, String> escapeFun) {
+            return this.andThen(v -> v.map(escapeFun))::apply;
+        }
+
+
+        /**
          * A value renderer for anything, that maps it to string using
          * {@link Object#toString()}. When the value is null, the empty
          * string is used instead of the string "null".
@@ -483,6 +556,8 @@ public interface LiveTemplateBuilder<D> {
             // only build the template once
             LiveTemplate<T> subTemplate = childBuilder.toTemplate();
 
+            // ensure the template itself is never escaped in full, even after a lift call
+
             return new ValueRenderer<T>() {
                 @Override
                 public Val<String> apply(T t) {
@@ -491,13 +566,30 @@ public interface LiveTemplateBuilder<D> {
 
 
                 @Override
+                public ValueRenderer<T> escapeWith(Function<String, String> escapeFun) {
+                    // ignore it
+                    return this;
+                }
+
+
+                @Override
                 public ValueRenderer<ObservableValue<T>> lift() {
-                    return tObs -> {
-                        // Cannot use flatmap here, the Val<String> must be a subtemplate
-                        // and not a FlatMappedVal
-                        subTemplate.dataContextProperty().unbind();
-                        subTemplate.dataContextProperty().bind(tObs);
-                        return subTemplate;
+                    return new ValueRenderer<ObservableValue<T>>() {
+                        @Override
+                        public ValueRenderer<ObservableValue<T>> escapeWith(Function<String, String> escapeFun) {
+                            // ignore it
+                            return this;
+                        }
+
+
+                        @Override
+                        public Val<String> apply(ObservableValue<T> tObs) {
+                            // Cannot use flatmap here, the Val<String> must be a subtemplate
+                            // and not a FlatMappedVal
+                            subTemplate.dataContextProperty().unbind();
+                            subTemplate.dataContextProperty().bind(tObs);
+                            return subTemplate;
+                        }
                     };
                 }
             };
