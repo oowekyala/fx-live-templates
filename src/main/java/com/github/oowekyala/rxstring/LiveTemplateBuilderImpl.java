@@ -4,23 +4,19 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Consumer;
 import java.util.function.Function;
 
-import org.reactfx.value.Val;
-
 import com.github.oowekyala.rxstring.BindingExtractor.ConstantBinding;
-import javafx.beans.value.ObservableValue;
 import javafx.collections.ObservableList;
 
 
 /**
+ * Implementation.
+ *
  * @author Clément Fournier
  * @since 1.0
  */
-class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
-
-    // TODO everything could be mapped to seqs here and support low-level delimiting logic
+final class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
 
     private final List<BindingExtractor<D>> myBindings;
     private final InheritableConfig myInheritableConfig;
@@ -63,8 +59,8 @@ class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
 
 
     @Override
-    public LiveTemplateBuilder<D> appendIndent(int level) {
-        return appendIndent(level, myInheritableConfig.defaultIndent);
+    public String getDefaultIndent() {
+        return myInheritableConfig.defaultIndent;
     }
 
 
@@ -76,27 +72,8 @@ class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
 
 
     @Override
-    public <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<T>> extractor, Function<? super T, String> renderer) {
-        myBindings.add(BindingExtractor.lift(extractor.andThen(Val::wrap).andThen(val -> val.map(renderer))));
-        return this;
-    }
-
-
-    @Override
-    public <T> LiveTemplateBuilder<D> bindTemplate(Function<? super D, ? extends ObservableValue<T>> extractor,
-                                                   Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
-
-        LiveTemplateBuilder<T> builder = spawnChildWithSameConfig();
-        subTemplateBuilder.accept(builder);
-
-        myBindings.add(BindingExtractor.makeTemplateBinding(extractor, builder));
-        return this;
-    }
-
-
-    @Override
-    public <T> LiveTemplateBuilder<D> bindSeq(ValueRenderer<? super T> renderer, Function<D, ? extends ObservableList<? extends T>> extractor) {
-        myBindings.add(BindingExtractor.makeSeqBinding(extractor, renderer));
+    public <T> LiveTemplateBuilder<D> bindSeq(SeqRenderer<? super T> renderer, Function<D, ? extends ObservableList<? extends T>> extractor) {
+        myBindings.add(extractor.andThen(renderer)::apply);
         return this;
     }
 

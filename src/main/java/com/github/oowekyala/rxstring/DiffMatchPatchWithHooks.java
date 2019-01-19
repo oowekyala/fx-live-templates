@@ -38,7 +38,7 @@ import java.util.regex.Pattern;
 
 
 /**
- * Wrapper around a DiffMatchPatch which augments the patchApply function
+ * Wrapper around a {@link diff_match_patch} which augments the patchApply function
  * with an external handler to apply a patch to the contents of a text area.
  *
  * <p>This is quite a hack, nearly 100% copy-paste. I hope there's no problem with license

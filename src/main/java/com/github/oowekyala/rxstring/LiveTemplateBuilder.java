@@ -8,6 +8,8 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import org.reactfx.Subscription;
+import org.reactfx.collection.LiveArrayList;
+import org.reactfx.collection.LiveList;
 import org.reactfx.value.Val;
 
 import javafx.beans.value.ObservableValue;
@@ -17,10 +19,68 @@ import javafx.collections.ObservableList;
 /**
  * Builds a {@link LiveTemplate} with a fluent API.
  *
+ * <p>A template can have the following structural elements:
+ * <ul>
+ * <li>String constants: those are independent of the data context. See
+ * {@link #append(String)}, {@link #appendLine(String)}, {@link #appendIndent(int)}.</li>
+ * <li>{@link #render(Function, ValueRenderer) Constant bindings}: those will be
+ * extracted from the data context at the time the template is bound, but are not
+ * observable values themselves, so will only be rendered once.</li>
+ * <li>Observable bindings: those will be extracted from the data context
+ * at the time the template is bound. Each time a property of the data context
+ * changes value, the template updates its string value and calls its {@linkplain LiveTemplate#addReplaceHandler(ReplaceHandler) replace handlers}.
+ * At the time of construction though, those are specified by an extraction
+ * function, and a {@linkplain ValueRenderer rendering function}. Some rendering
+ * functions are remarkable:
+ * <ul>
+ * <li>{@linkplain #bind(Function, ValueRenderer) String rendering}: the value of the property
+ * is just converted to a string.</li>
+ * <li>{@linkplain #bindTemplate(Function, Consumer) Subtemplate rendering}: the
+ * value of the property is bound to the datacontext of a sub-template. </li>
+ * <li>{@linkplain #bindSeq(Function) Sequence rendering}: if a property is an
+ * {@link ObservableList}, then changes to its individual components can be rendered
+ * independently. The individual components can be rendered using any rendering method.
+ * </li>
+ * </ul>
+ * </li>
+ * </ul>
+ * <ul>
+ *
+ * Builders own a small set of configuration properties that are ignored by the templates they build,
+ * but allow using shorthands during the construction process. These are
+ * <ul>
+ * <li>{@linkplain #withDefaultIndent(String) the default indentation}</li>
+ * <li>TODO default string escape</li>
+ * </ul>
+ * The sub-templates specified with {@link #bindTemplate(Function, Consumer)} also inherit these properties.
+ *
  * @author Clément Fournier
  * @since 1.0
  */
 public interface LiveTemplateBuilder<D> {
+
+    // builder configuration
+
+
+    /**
+     * Sets the default indentation string used by {@link #appendIndent(int)}.
+     *
+     * @param indentStyle New default indent style
+     *
+     * @return This builder
+     *
+     * @throws NullPointerException if the identStyle is null
+     */
+    LiveTemplateBuilder<D> withDefaultIndent(String indentStyle);
+
+
+    /**
+     * Returns the default indentation string, specified by
+     * {@link #withDefaultIndent(String)}.
+     */
+    String getDefaultIndent();
+
+    // constant binding
 
 
     /**
@@ -68,19 +128,9 @@ public interface LiveTemplateBuilder<D> {
      *
      * @see #appendIndent(int, String)
      */
-    LiveTemplateBuilder<D> appendIndent(int level);
-
-
-    /**
-     * Sets the default indentation string used by {@link #appendIndent(int)}.
-     *
-     * @param indentStyle New default indent style
-     *
-     * @return This builder
-     *
-     * @throws NullPointerException if the identStyle is null
-     */
-    LiveTemplateBuilder<D> withDefaultIndent(String indentStyle);
+    default LiveTemplateBuilder<D> appendIndent(int level) {
+        return appendIndent(level, getDefaultIndent());
+    }
 
 
     /**
@@ -101,6 +151,29 @@ public interface LiveTemplateBuilder<D> {
         return this;
     }
 
+    // property binding
+
+
+    /**
+     * Renders a value of the data context using the specified renderer. If the
+     * value is not observable, then this will only be rendered once, at the time
+     * of binding. Use {@link #bind(Function, ValueRenderer)} or {@link #bindTemplate(Function, Consumer)}
+     * if your value is observable, {@link #bindSeq(SeqRenderer, Function)} if it's
+     * an observable list.
+     *
+     * @param extractor Extracts the value to render from the data context
+     * @param renderer  An object specifying how the value should be converted to a string
+     * @param <T>       Type of value to extract
+     *
+     * @return This builder
+     *
+     * @see #bindSeq(SeqRenderer, Function)
+     * @see #bind(Function, ValueRenderer)
+     */
+    default <T> LiveTemplateBuilder<D> render(Function<? super D, ? extends T> extractor, ValueRenderer<T> renderer) {
+        return bindSeq(renderer, extractor.andThen(LiveArrayList<T>::new)::apply);
+    }
+
 
     /**
      * Binds a property of the data context to be rendered with {@link Object#toString()}.
@@ -110,10 +183,10 @@ public interface LiveTemplateBuilder<D> {
      *
      * @return This builder
      *
-     * @see #bind(Function, Function)
+     * @see #bind(Function, ValueRenderer)
      */
     default <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<T>> extractor) {
-        return bind(extractor, Object::toString);
+        return bind(extractor, ValueRenderer.asString());
     }
 
 
@@ -123,17 +196,29 @@ public interface LiveTemplateBuilder<D> {
      * instead.
      *
      * @param extractor Extracts the observable value to render from the data context
-     * @param renderer  Converts the value to a string. Should handle null values if the
-     *                  observable value may be null.
+     * @param renderer  An object specifying how the value should be converted to a string
      *
      * @return This builder
+     *
+     * @see #bindTemplate(Function, Consumer)
+     * @see #bindSeq(SeqRenderer, Function)
+     * @see #render(Function, ValueRenderer)
      */
-    <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<T>> extractor, Function<? super T, String> renderer);
+    default <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<T>> extractor, ValueRenderer<T> renderer) {
+        return render(extractor, renderer.lift());
+    }
 
 
     /**
      * Binds a property of the data context to be presented with a sub-template.
-     * When the property has a null value, the string is not output.
+     * The value of the property will be used as the data context of the sub template.
+     * When the property has a null value, the empty string is rendered instead.
+     *
+     * <p>It's recommended to use a sub-template when the value's string representation
+     * has many string constants that don't depend on changes in the value's state, or
+     * when it depends on several independent observable values. With a sub-template, the
+     * changes to the string value will be scoped down to the individual changes in the
+     * properties of the sub context, which improves the resolution of the external handler calls.
      *
      * @param extractor          Extracts an observable value representing the
      *                           data context of the sub-template
@@ -142,35 +227,62 @@ public interface LiveTemplateBuilder<D> {
      * @param <T>                Type of the data context for the sub-template
      *
      * @return This builder
+     *
+     * @see #bind(Function, ValueRenderer)
      */
-    <T> LiveTemplateBuilder<D> bindTemplate(Function<? super D, ? extends ObservableValue<T>> extractor,
-                                            Consumer<LiveTemplateBuilder<T>> subTemplateBuilder);
+    default <T> LiveTemplateBuilder<D> bindTemplate(Function<? super D, ? extends ObservableValue<T>> extractor,
+                                                    Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
+        return bind(extractor, ValueRenderer.templated(this, subTemplateBuilder));
+    }
 
 
     /**
      * Binds a property of the data context that returns an observable list of items.
-     * Items will be mapped to strings with the specified {@link ValueRenderer} function.
-     * Changes in individual items of the list are reflected in the value of the template.
+     * The list will be mapped to a list of strings with the with the specified {@link SeqRenderer}.
+     * Most of the time you'll want to use {@link #bindSeq(ValueRenderer, Function)}.
+     *
+     * <p>Changes in individual items of the list are reflected in the value of the template.
      * Only minimal changes are pushed: items are rendered incrementally (ie the whole list
-     * is not rendered every time there's a change in one item. If the renderer function
-     * itself is a live template, then the minimal changes from that template will be forwarded,
-     * so the changes will be even finer.
+     * is not rendered every time there's a change in one item). If the renderer function
+     * itself produces live templates, then the minimal changes from that template will be
+     * forwarded, so the changes will be even finer.
      *
      * FIXME this doesn't play well with JavaFX's native ListProperty because it fires too many events
      *
      * @param renderer  Renderer function
-     * @param extractor Value extractor
+     * @param extractor List extractor
      * @param <T>       Type of items of the list
      *
      * @return This builder
+     *
+     * @see #bindSeq(ValueRenderer, Function)
+     * @see #bindTemplatedSeq(Function, Consumer)
      */
-    <T> LiveTemplateBuilder<D> bindSeq(ValueRenderer<? super T> renderer,
+    <T> LiveTemplateBuilder<D> bindSeq(SeqRenderer<? super T> renderer,
                                        Function<D, ? extends ObservableList<? extends T>> extractor);
 
 
     /**
+     * Binds a property of the data context that returns an observable list of items.
+     * Each item will be mapped to a string using the specified {@link ValueRenderer}.
+     *
+     * @param renderer  Renderer function for items
+     * @param extractor List extractor
+     * @param <T>       Type of items of the list
+     *
+     * @return This builder
+     *
+     * @see #bindSeq(SeqRenderer, Function)
+     */
+    default <T> LiveTemplateBuilder<D> bindSeq(ValueRenderer<? super T> renderer,
+                                               Function<D, ? extends ObservableList<? extends T>> extractor) {
+        return bindSeq(renderer.toSeq(), extractor);
+    }
+
+
+    /**
      * Binds a property of the data context that returns an observable list of items,
-     * that are rendered with {@link ValueRenderer#templated(Consumer)}. The sub template
+     * that are rendered with {@link ValueRenderer#templated(LiveTemplateBuilder, Consumer)}. The sub template
      * builder inherits the configuration of this builder (like the {@linkplain #withDefaultIndent(String)
      * default indentation}).
      *
@@ -252,12 +364,44 @@ public interface LiveTemplateBuilder<D> {
 
 
     /**
+     * A type used to map observable lists to observable lists of strings.
+     * This is not really meant to be used from user code for now. Instead
+     * you can use a {@link ValueRenderer} and pass it to {@link #bindSeq(ValueRenderer, Function)}.
+     *
+     * @param <T> Type of values of the list
+     */
+    @FunctionalInterface
+    interface SeqRenderer<T> extends Function<ObservableList<? extends T>, LiveList<Val<String>>> {
+        // TODO support delimiter logic!
+    }
+
+    /**
      * A type used to render objects of type T in a template.
      * This interface provides many ready-to-use implementations.
      *
      * @param <T> Type of values to map
      */
-    interface ValueRenderer<T> extends Function<T, ObservableValue<String>> {
+    @FunctionalInterface
+    interface ValueRenderer<T> extends Function<T, Val<String>> {
+
+        /**
+         * Returns a renderer that can render ObservableValues of T.
+         */
+        default ValueRenderer<ObservableValue<T>> lift() {
+            // The default implementation is to use {@link Val#flatMap(Function)},
+            // but the templated renderer has to preserve the fact that the end Val<String>
+            // is in fact a sub template
+            return tObs -> Val.flatMap(tObs, this);
+        }
+
+
+        /**
+         * Lifts this renderer to a {@link SeqRenderer}.
+         */
+        default SeqRenderer<T> toSeq() {
+            return seq -> LiveList.map(seq, this);
+        }
+
 
         /**
          * A value renderer for anything, that maps it to string using
@@ -318,7 +462,7 @@ public interface LiveTemplateBuilder<D> {
          * A value renderer that renders Ts using a nested live template. This is what {@link LiveTemplateBuilder#bindTemplatedSeq(Function, Consumer)}
          * and {@link LiveTemplateBuilder#bindTemplate(Function, Consumer)} use under the hood.
          *
-         * @param parent             Parent builder, which copies its configuration (like default indent,
+         * @param parent             Parent builder, which copies its local configuration (like default indent,
          *                           but not its bindings) to the child
          * @param subTemplateBuilder A function side-effecting on the builder of the sub-template
          *                           to configure it
@@ -328,16 +472,34 @@ public interface LiveTemplateBuilder<D> {
          */
         static <T> ValueRenderer<T> templated(LiveTemplateBuilder<?> parent, Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
             LiveTemplateBuilder<T> childBuilder =
-                parent == null ? LiveTemplate.builder()
-                               : ((LiveTemplateBuilderImpl) parent).spawnChildWithSameConfig();
+                parent == null
+                ? LiveTemplate.builder()
+                : ((LiveTemplateBuilderImpl) parent).spawnChildWithSameConfig();
 
             subTemplateBuilder.accept(childBuilder);
             // create a single builder that will spawn several templates
+            // only build the template once
 
-            return t -> {
-                LiveTemplate<T> template = childBuilder.toTemplate();
-                template.setDataContext(t);
-                return template;
+            // only build the template once
+            LiveTemplate<T> subTemplate = childBuilder.toTemplate();
+
+            return new ValueRenderer<T>() {
+                @Override
+                public Val<String> apply(T t) {
+                    return childBuilder.toBoundTemplate(t);
+                }
+
+
+                @Override
+                public ValueRenderer<ObservableValue<T>> lift() {
+                    return tObs -> {
+                        // Cannot use flatmap here, the Val<String> must be a subtemplate
+                        // and not a FlatMappedVal
+                        subTemplate.dataContextProperty().unbind();
+                        subTemplate.dataContextProperty().bind(tObs);
+                        return subTemplate;
+                    };
+                }
             };
         }
     }

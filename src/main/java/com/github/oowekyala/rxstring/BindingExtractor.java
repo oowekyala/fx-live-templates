@@ -1,6 +1,5 @@
 package com.github.oowekyala.rxstring;
 
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 import org.reactfx.Subscription;
@@ -8,13 +7,10 @@ import org.reactfx.collection.LiveArrayList;
 import org.reactfx.collection.LiveList;
 import org.reactfx.value.Val;
 
-import javafx.beans.value.ObservableValue;
-import javafx.collections.ObservableList;
-
 
 /**
  * Extracts a LiveList[Val[String]] from a data context and binds its values.
- * Used by the {@link LiveTemplateBuilderImpl}.
+ * Used by the {@link BoundLiveTemplate}, created by the {@link LiveTemplateBuilderImpl}.
  *
  * @author Clément Fournier
  * @since 1.0
@@ -78,33 +74,6 @@ interface BindingExtractor<D> {
 
     static <T> ConstantBinding<T> makeConstant(String s) {
         return new ConstantBinding<>(s);
-    }
-
-
-    static <T> BindingExtractor<T> lift(Function<? super T, ObservableValue<String>> f) {
-        return t -> new LiveArrayList<>(f.andThen(Val::wrap).apply(t));
-    }
-
-
-    static <D, T> BindingExtractor<D> makeSeqBinding(Function<D, ? extends ObservableList<? extends T>> extractor,
-                                                     Function<? super T, ? extends ObservableValue<String>> renderer) {
-        return d -> LiveList.map(extractor.apply(d), renderer.andThen(Val::wrap));
-    }
-
-
-    static <D, Sub> BindingExtractor<D> makeTemplateBinding(Function<? super D, ? extends ObservableValue<Sub>> extractor,
-                                                            LiveTemplateBuilder<Sub> subTemplateBuilder) {
-
-        // only build the template once
-        LiveTemplate<Sub> subTemplate = subTemplateBuilder.toTemplate();
-
-        Function<ObservableValue<Sub>, LiveTemplate<Sub>> templateMaker = obsT -> {
-            subTemplate.dataContextProperty().unbind();
-            subTemplate.dataContextProperty().bind(obsT);
-            return subTemplate;
-        };
-
-        return lift(extractor.andThen(templateMaker));
     }
 
 
