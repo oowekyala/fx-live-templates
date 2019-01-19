@@ -9,6 +9,8 @@ import java.util.function.Function;
 
 import org.reactfx.Subscription;
 import org.reactfx.collection.LiveArrayList;
+import org.reactfx.collection.LiveList;
+import org.reactfx.value.Val;
 
 import javafx.beans.value.ObservableValue;
 import javafx.collections.ObservableList;
@@ -21,17 +23,17 @@ import javafx.collections.ObservableList;
  * <ul>
  * <li>String constants: those are independent of the data context. See
  * {@link #append(String)}, {@link #appendLine(String)}, {@link #appendIndent(int)}.</li>
- * <li>{@link #render(Function, ValueRenderer) Constant bindings}: those will be
+ * <li>{@link #render(Function, ItemRenderer) Constant bindings}: those will be
  * extracted from the data context at the time the template is bound, but are not
  * observable values themselves, so will only be rendered once.</li>
  * <li>Observable bindings: those will be extracted from the data context
  * at the time the template is bound. Each time a property of the data context
  * changes value, the template updates its string value and calls its {@linkplain LiveTemplate#addReplaceHandler(ReplaceHandler) replace handlers}.
  * At the time of construction though, those are specified by an extraction
- * function, and a {@linkplain ValueRenderer rendering function}. Some rendering
+ * function, and a {@linkplain ItemRenderer rendering function}. Some rendering
  * functions are remarkable:
  * <ul>
- * <li>{@linkplain #bind(Function, ValueRenderer) String rendering}: the value of the property
+ * <li>{@linkplain #bind(Function, ItemRenderer) String rendering}: the value of the property
  * is just converted to a string.</li>
  * <li>{@linkplain #bindTemplate(Function, Consumer) Subtemplate rendering}: the
  * value of the property is bound to the datacontext of a sub-template. </li>
@@ -87,9 +89,9 @@ public interface LiveTemplateBuilder<D> {
      * functions must be escaped for XML. The default is just the identity function.
      *
      * <p>Note: the escape function is not applied to whole {@linkplain #bindTemplate(Function, Consumer) sub-templates},
-     * but is passed on to their builder and applied to their own {@linkplain #bind(Function, ValueRenderer) bind calls}
+     * but is passed on to their builder and applied to their own {@linkplain #bind(Function, ItemRenderer) bind calls}
      * unless replaced. The escape function also doesn't apply to {@linkplain #append(String) string constants}
-     * and sequence bindings that use the overload {@link #bindSeq(SeqRenderer, Function)}.
+     * and sequence bindings that use the overload {@link #bindSeq(Function, SeqRenderer)}.
      *
      * @param stringEscapeFunction String escape function
      *
@@ -183,8 +185,8 @@ public interface LiveTemplateBuilder<D> {
     /**
      * Renders a value of the data context using the specified renderer. If the
      * value is not observable, then this will only be rendered once, at the time
-     * of binding. Use {@link #bind(Function, ValueRenderer)} or {@link #bindTemplate(Function, Consumer)}
-     * if your value is observable, {@link #bindSeq(SeqRenderer, Function)} if it's
+     * of binding. Use {@link #bind(Function, ItemRenderer)} or {@link #bindTemplate(Function, Consumer)}
+     * if your value is observable, {@link #bindSeq(Function, SeqRenderer)} if it's
      * an observable list.
      *
      * @param extractor Extracts the value to render from the data context
@@ -193,12 +195,12 @@ public interface LiveTemplateBuilder<D> {
      *
      * @return This builder
      *
-     * @see #bindSeq(SeqRenderer, Function)
-     * @see #bind(Function, ValueRenderer)
+     * @see #bindSeq(Function, SeqRenderer)
+     * @see #bind(Function, ItemRenderer)
      */
-    default <T> LiveTemplateBuilder<D> render(Function<? super D, ? extends T> extractor, ValueRenderer<T> renderer) {
+    default <T> LiveTemplateBuilder<D> render(Function<? super D, ? extends T> extractor, ItemRenderer<T> renderer) {
         // note: don't use the bindSeq with ValueRenderer here as it escapes the content
-        return bindSeq(renderer, extractor.andThen(LiveArrayList<T>::new)::apply);
+        return bindSeq(extractor.andThen(Val::constant).andThen(LiveList::wrapVal)::apply, renderer);
     }
 
 
@@ -210,10 +212,10 @@ public interface LiveTemplateBuilder<D> {
      *
      * @return This builder
      *
-     * @see #bind(Function, ValueRenderer)
+     * @see #bind(Function, ItemRenderer)
      */
     default <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<T>> extractor) {
-        return bind(extractor, ValueRenderer.asString());
+        return bind(extractor, ItemRenderer.asString());
     }
 
 
@@ -228,10 +230,10 @@ public interface LiveTemplateBuilder<D> {
      * @return This builder
      *
      * @see #bindTemplate(Function, Consumer)
-     * @see #bindSeq(SeqRenderer, Function)
-     * @see #render(Function, ValueRenderer)
+     * @see #bindSeq(Function, SeqRenderer)
+     * @see #render(Function, ItemRenderer)
      */
-    default <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<T>> extractor, ValueRenderer<T> renderer) {
+    default <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<T>> extractor, ItemRenderer<T> renderer) {
         return render(extractor, renderer.lift());
     }
 
@@ -247,11 +249,11 @@ public interface LiveTemplateBuilder<D> {
      * @return This builder
      *
      * @see #bindTemplate(Function, Consumer)
-     * @see #bindSeq(SeqRenderer, Function)
-     * @see #render(Function, ValueRenderer)
+     * @see #bindSeq(Function, SeqRenderer)
+     * @see #render(Function, ItemRenderer)
      */
     default <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<T>> extractor, Function<T, String> renderer) {
-        return bind(extractor, ValueRenderer.asString(renderer));
+        return bind(extractor, ItemRenderer.asString(renderer));
     }
 
 
@@ -274,18 +276,18 @@ public interface LiveTemplateBuilder<D> {
      *
      * @return This builder
      *
-     * @see #bind(Function, ValueRenderer)
+     * @see #bind(Function, ItemRenderer)
      */
     default <T> LiveTemplateBuilder<D> bindTemplate(Function<? super D, ? extends ObservableValue<T>> extractor,
                                                     Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
-        return bind(extractor, ValueRenderer.templated(this, subTemplateBuilder));
+        return bind(extractor, ItemRenderer.templated(this, subTemplateBuilder));
     }
 
 
     /**
      * Binds a property of the data context that returns an observable list of items.
      * The list will be mapped to a list of strings with the with the specified {@link SeqRenderer}.
-     * Most of the time you'll want to use {@link #bindSeq(ValueRenderer, Function)},
+     * Most of the time you'll want to use {@link #bindSeq(Function, ItemRenderer)},
      * this overload is mostly there for code organisation.
      *
      * <p>Note: the {@linkplain #withDefaultEscape(Function) default escape function}
@@ -293,22 +295,22 @@ public interface LiveTemplateBuilder<D> {
      *
      * FIXME this doesn't play well with JavaFX's native ListProperty because it fires too many events
      *
-     * @param renderer  Renderer function
-     * @param extractor List extractor
      * @param <T>       Type of items of the list
+     * @param extractor List extractor
+     * @param renderer  Renderer function
      *
      * @return This builder
      *
-     * @see #bindSeq(ValueRenderer, Function)
+     * @see #bindSeq(Function, ItemRenderer)
      * @see #bindTemplatedSeq(Function, Consumer)
      */
-    <T> LiveTemplateBuilder<D> bindSeq(SeqRenderer<? super T> renderer,
-                                       Function<D, ? extends ObservableList<? extends T>> extractor);
+    <T> LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<? extends T>> extractor,
+                                       SeqRenderer<? super T> renderer);
 
 
     /**
      * Binds a property of the data context that returns an observable list of items.
-     * Each item will be mapped to a string using the specified {@link ValueRenderer}.
+     * Each item will be mapped to a string using the specified {@link ItemRenderer}.
      *
      * <p>Changes in individual items of the list are reflected in the value of the template.
      * Only minimal changes are pushed: items are rendered incrementally (ie the whole list
@@ -316,15 +318,34 @@ public interface LiveTemplateBuilder<D> {
      * itself produces live templates, then the minimal changes from that template will be
      * forwarded, so the changes will be even finer.
      *
-     * @param renderer  Renderer function for items
-     * @param extractor List extractor
      * @param <T>       Type of items of the list
+     * @param extractor List extractor
+     * @param renderer  Renderer function for items
      *
      * @return This builder
      */
-    default <T> LiveTemplateBuilder<D> bindSeq(ValueRenderer<? super T> renderer,
-                                               Function<D, ? extends ObservableList<? extends T>> extractor) {
-        return bindSeq(renderer.escapeWith(getDefaultEscapeFunction()).toSeq(), extractor);
+    default <T> LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<? extends T>> extractor,
+                                               ItemRenderer<? super T> renderer) {
+        return bindSeq(extractor, renderer.escapeWith(getDefaultEscapeFunction()).toSeq());
+    }
+
+
+    /**
+     * Binds a property of the data context that returns an observable list of items.
+     * Each item will be mapped to a string using the specified renderer function, then
+     * the {@linkplain #withDefaultEscape(Function) escape handler}.
+     *
+     * @param <T>       Type of items of the list
+     * @param extractor List extractor
+     * @param renderer  Renderer function for items
+     *
+     * @return This builder
+     *
+     * @see #bindSeq(Function, ItemRenderer)
+     */
+    default <T> LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<? extends T>> extractor,
+                                               Function<? super T, String> renderer) {
+        return bindSeq(extractor, ItemRenderer.asString(renderer));
     }
 
 
@@ -345,7 +366,7 @@ public interface LiveTemplateBuilder<D> {
      */
     default <T> LiveTemplateBuilder<D> bindTemplatedSeq(Function<D, ? extends ObservableList<? extends T>> extractor,
                                                         Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
-        return bindSeq(ValueRenderer.templated(this, subTemplateBuilder), extractor);
+        return bindSeq(extractor, ItemRenderer.templated(this, subTemplateBuilder));
     }
 
 
@@ -357,7 +378,7 @@ public interface LiveTemplateBuilder<D> {
      * @return This builder
      */
     default LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<?>> extractor) {
-        return bindSeq(ValueRenderer.asString(), extractor);
+        return bindSeq(extractor, ItemRenderer.asString());
     }
 
 

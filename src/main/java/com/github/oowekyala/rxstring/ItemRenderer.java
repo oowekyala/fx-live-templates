@@ -11,19 +11,16 @@ import javafx.beans.value.ObservableValue;
 
 /**
  * A type used to render objects of type T in a template.
- * You're not encouraged to use this class directly, most
- * of what it can do is already covered by the overloads
- * in {@link LiveTemplateBuilder}.
  *
  * @param <T> Type of values to map
  */
-public class ValueRenderer<T> implements Function<T, Val<String>> {
+public class ItemRenderer<T> implements Function<T, Val<String>> {
 
     private final Function<? super T, ? extends Val<String>> myFun;
     private final boolean myNoEscape;
 
 
-    ValueRenderer(Function<? super T, ? extends Val<String>> fun, boolean ignoreEscape) {
+    ItemRenderer(boolean ignoreEscape, Function<? super T, ? extends Val<String>> fun) {
         myFun = fun;
         this.myNoEscape = ignoreEscape;
     }
@@ -32,11 +29,11 @@ public class ValueRenderer<T> implements Function<T, Val<String>> {
     /**
      * Returns a renderer that can render ObservableValues of T.
      */
-    ValueRenderer<ObservableValue<T>> lift() {
+    ItemRenderer<ObservableValue<T>> lift() {
         // The default implementation is to use {@link Val#flatMap(Function)},
         // but the templated renderer has to preserve the fact that the end Val<String>
         // is in fact a sub template
-        return new ValueRenderer<>(tObs -> Val.flatMap(tObs, this), myNoEscape);
+        return new ItemRenderer<>(myNoEscape, tObs -> Val.flatMap(tObs, this));
     }
 
 
@@ -49,8 +46,8 @@ public class ValueRenderer<T> implements Function<T, Val<String>> {
      *
      * @return A new renderer
      */
-    public ValueRenderer<T> escapeWith(Function<String, String> escapeFun) {
-        return myNoEscape ? this : new ValueRenderer<>(myFun.andThen(v -> v.map(escapeFun)), true);
+    public ItemRenderer<T> escapeWith(Function<String, String> escapeFun) {
+        return myNoEscape ? this : new ItemRenderer<>(/* ignoreEscape */true, myFun.andThen(v -> v.map(escapeFun)));
     }
 
 
@@ -58,7 +55,7 @@ public class ValueRenderer<T> implements Function<T, Val<String>> {
      * Lifts this renderer to a {@link SeqRenderer}.
      */
     SeqRenderer<T> toSeq() {
-        return seq -> LiveList.map(seq, this);
+        return new SeqRenderer<>(seq -> LiveList.map(seq, this));
     }
 
 
@@ -69,8 +66,8 @@ public class ValueRenderer<T> implements Function<T, Val<String>> {
 
 
     @Override
-    public <V> ValueRenderer<V> compose(Function<? super V, ? extends T> before) {
-        return new ValueRenderer<>(myFun.compose(before), myNoEscape);
+    public <V> ItemRenderer<V> compose(Function<? super V, ? extends T> before) {
+        return new ItemRenderer<>(myNoEscape, myFun.compose(before));
     }
 
 
@@ -81,7 +78,7 @@ public class ValueRenderer<T> implements Function<T, Val<String>> {
      *
      * @param <T> Any reference type
      */
-    public static <T> ValueRenderer<T> asString() {
+    public static <T> ItemRenderer<T> asString() {
         return asString(Object::toString);
     }
 
@@ -92,8 +89,8 @@ public class ValueRenderer<T> implements Function<T, Val<String>> {
      * @param f   Mapper from T to String
      * @param <T> Type of values this renderer can handle
      */
-    public static <T> ValueRenderer<T> asString(Function<? super T, String> f) {
-        return new ValueRenderer<>(f.andThen(Val::constant), false);
+    public static <T> ItemRenderer<T> asString(Function<? super T, String> f) {
+        return new ItemRenderer<>(false, f.andThen(Val::constant));
     }
 
 
@@ -105,8 +102,8 @@ public class ValueRenderer<T> implements Function<T, Val<String>> {
      * @param ignoreEscape If true, the value of this renderer won't be escaped by {@link LiveTemplateBuilder#withDefaultEscape(Function)}.
      * @param <T>          Type of values this renderer can handle
      */
-    public static <T> ValueRenderer<T> mappingObservable(Function<? super T, ? extends ObservableValue<String>> fun, boolean ignoreEscape) {
-        return new ValueRenderer<>(fun.andThen(Val::wrap), false);
+    public static <T> ItemRenderer<T> mappingObservable(Function<? super T, ? extends ObservableValue<String>> fun, boolean ignoreEscape) {
+        return new ItemRenderer<>(false, fun.andThen(Val::wrap));
     }
 
 
@@ -122,7 +119,7 @@ public class ValueRenderer<T> implements Function<T, Val<String>> {
      *
      * @return A value renderer for Ts
      */
-    static <T> ValueRenderer<T> templated(LiveTemplateBuilder<?> parent, Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
+    static <T> ItemRenderer<T> templated(LiveTemplateBuilder<?> parent, Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
         LiveTemplateBuilder<T> childBuilder =
             parent == null
             ? LiveTemplate.builder()
@@ -137,18 +134,29 @@ public class ValueRenderer<T> implements Function<T, Val<String>> {
 
         // ensure the template itself is never escaped in full, even after a lift call
 
-        return new ValueRenderer<T>(childBuilder::toBoundTemplate, true) {
+        return new ItemRenderer<T>(true, childBuilder::toBoundTemplate) {
 
             @Override
-            public ValueRenderer<ObservableValue<T>> lift() {
-                return new ValueRenderer<>(tObs -> {
+            public ItemRenderer<ObservableValue<T>> lift() {
+                return new ItemRenderer<>(true, tObs -> {
                     // Cannot use flatmap here, the Val<String> must be a subtemplate
                     // and not a FlatMappedVal
                     subTemplate.dataContextProperty().unbind();
                     subTemplate.dataContextProperty().bind(tObs);
                     return subTemplate;
-                }, true);
+                });
             }
         };
+    }
+
+
+    private static class DummyDataContext<T> {
+
+        public final T value;
+
+
+        private DummyDataContext(T value) {
+            this.value = value;
+        }
     }
 }

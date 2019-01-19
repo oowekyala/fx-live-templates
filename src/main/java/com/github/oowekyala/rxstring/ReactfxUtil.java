@@ -1,8 +1,11 @@
 package com.github.oowekyala.rxstring;
 
+import java.util.AbstractList;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 
 import org.reactfx.EventStreams;
 import org.reactfx.Subscription;
@@ -16,10 +19,35 @@ import javafx.collections.ObservableList;
  * @author Clément Fournier
  * @since 1.0
  */
-public final class ReactfxUtil {
+final class ReactfxUtil {
 
     private ReactfxUtil() {
 
+    }
+
+
+    public static <E, F> List<F> lazyMappedView(
+        List<? extends E> source,
+        Function<? super E, ? extends F> f) {
+        return new AbstractList<F>() {
+
+            private List<F> cache = new ArrayList<>(Collections.nCopies(source.size(), null));
+
+
+            @Override
+            public F get(int index) {
+                if (cache.get(index) == null) {
+                    cache.set(index, f.apply(source.get(index)));
+                }
+                return cache.get(index);
+            }
+
+
+            @Override
+            public int size() {
+                return source.size();
+            }
+        };
     }
 
 
@@ -57,10 +85,9 @@ public final class ReactfxUtil {
                 } else {
                     if (ch.wasRemoved()) {
                         // oldList[from : from + removed.size] === removed
-                        int i = ch.getFrom();
+                        int from = ch.getFrom();
                         for (T ignored : ch.getRemoved()) {
-                            elemSubs.remove(i).unsubscribe();
-                            i++;
+                            elemSubs.remove(from).unsubscribe();
                         }
                     }
                     if (ch.wasAdded()) {

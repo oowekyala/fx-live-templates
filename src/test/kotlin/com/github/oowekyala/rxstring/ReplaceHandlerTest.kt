@@ -292,6 +292,8 @@ class ReplaceHandlerTest : FunSpec({
             val subs = FXCollections.observableArrayList(SubDContext())
         }
 
+        val events = mutableListOf<ReplaceEvent>()
+
         val lt = LiveTemplate
                 .builder<DContext>()
                 .append("<top name='").bind { it.name }.appendLine("'>")
@@ -299,18 +301,9 @@ class ReplaceHandlerTest : FunSpec({
                     sub.append("<sub name='").bind { it.name }.append("' num='").bind { it.num }.appendLine("'/>")
                 }
                 .append("</top>")
-                .toTemplate()
+                .toBoundTemplate(DContext(), ReplaceHandler { start, end, value -> events += ReplaceEvent(start, end, value) })
 
-        val events = mutableListOf<ReplaceEvent>()
-
-        lt.addReplaceHandler { start, end, value ->
-            events += ReplaceEvent(start, end, value)
-        }
-
-        lt.value shouldBe null
-
-        val dc = DContext()
-        lt.dataContext = dc
+        lt.isUseDiffMatchPatchStrategy = false
 
         val afterValue1 = """
             <top name='top'>

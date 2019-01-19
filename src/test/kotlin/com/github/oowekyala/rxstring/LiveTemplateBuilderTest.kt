@@ -2,6 +2,7 @@ package com.github.oowekyala.rxstring
 
 import io.kotlintest.shouldBe
 import io.kotlintest.specs.FunSpec
+import javafx.collections.FXCollections
 import org.reactfx.collection.LiveArrayList
 import org.reactfx.value.Var
 
@@ -169,6 +170,124 @@ class LiveTemplateBuilderTest : FunSpec({
             <top name='@top@'>
             <sub name='@foo@' num='@4@'/>
             </top>
+        """.trimIndent()
+
+    }
+
+    test("Test mapped bind") {
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+        }
+
+        val lt =
+                LiveTemplate.builder<DContext>()
+                        .append("<top name='").bind({ it.name }) { "@$it" }.append("'/>")
+                        .toBoundTemplate(DContext())
+
+        lt.value shouldBe """
+            <top name='@top'/>
+        """.trimIndent()
+
+        lt.dataContext.name.value = "foo"
+
+        lt.value shouldBe """
+            <top name='@foo'/>
+        """.trimIndent()
+
+    }
+
+    test("Test mapped bindSeq") {
+
+        class DContext {
+            val nums = FXCollections.observableArrayList(10, 15)
+        }
+
+        val lt =
+                LiveTemplate.builder<DContext>()
+                        .append("<top nums='").bindSeq({ it.nums }) { Integer.toHexString(it) + "," }.append("'/>")
+                        .toBoundTemplate(DContext())
+
+        lt.value shouldBe """
+            <top nums='a,f,'/>
+        """.trimIndent()
+
+        lt.dataContext.nums += 256
+
+        lt.value shouldBe """
+            <top nums='a,f,100,'/>
+        """.trimIndent()
+
+    }
+
+    test("Test delimited bindSeq") {
+
+        class DContext {
+            val nums = FXCollections.observableArrayList(10, 15)
+        }
+
+        val lt =
+                LiveTemplate.builder<DContext>()
+                        .append("<top nums='").bindSeq({ it.nums }, ItemRenderer.asString<Int>().toSeq().delimited("[", "]", ",")).append("'/>")
+                        .toBoundTemplate(DContext())
+
+        lt.value shouldBe """
+            <top nums='[10,15]'/>
+        """.trimIndent()
+
+        lt.dataContext.nums += 256
+
+        lt.value shouldBe """
+            <top nums='[10,15,256]'/>
+        """.trimIndent()
+
+        lt.dataContext.nums.clear()
+
+        lt.value shouldBe """
+            <top nums='[]'/>
+        """.trimIndent()
+
+        lt.dataContext.nums.add(4)
+
+        lt.value shouldBe """
+            <top nums='[4]'/>
+        """.trimIndent()
+
+        lt.dataContext.nums.add(5)
+
+        lt.value shouldBe """
+            <top nums='[4,5]'/>
+        """.trimIndent()
+
+        lt.dataContext.nums.removeAt(1)
+
+        lt.value shouldBe """
+            <top nums='[4]'/>
+        """.trimIndent()
+
+        lt.dataContext.nums.setAll(1, 2, 3)
+
+        lt.value shouldBe """
+            <top nums='[1,2,3]'/>
+        """.trimIndent()
+
+        lt.dataContext.nums[2] = 2
+
+        lt.value shouldBe """
+            <top nums='[1,2,2]'/>
+        """.trimIndent()
+
+        lt.dataContext.nums[0] = 2
+
+        lt.value shouldBe """
+            <top nums='[2,2,2]'/>
+        """.trimIndent()
+
+        lt.dataContext.nums.add(0,4)
+
+        // FIXME
+        lt.value shouldBe """
+            <top nums='[4,2,2,2]'/>
         """.trimIndent()
 
     }
