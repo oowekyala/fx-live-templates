@@ -134,7 +134,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         LiveList<Val<String>> lst = bindingExtractor.extract(context);
         mySequences.set(outerIdx, new ArrayList<>(lst.size()));
 
-        return Subscription.dynamic(lst, (elt, innerIdx) -> initVal(bindingExtractor, elt, outerIdx, innerIdx));
+        return ReactfxUtil.dynamic(lst, (elt, innerIdx) -> initVal(bindingExtractor, elt, outerIdx, innerIdx));
     }
 
 
