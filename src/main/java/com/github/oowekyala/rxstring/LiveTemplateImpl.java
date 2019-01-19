@@ -27,6 +27,7 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
     // Those are shared with all the bound templates this instance generates
     private final List<ReplaceHandler> myInternalReplaceHandlers = new ArrayList<>();
     private final List<ReplaceHandler> myUserReplaceHandlers = new ArrayList<>();
+    private final Var<Boolean> useDiffMatchPatch = Var.newSimpleVar(true);
 
 
     LiveTemplateImpl(List<BindingExtractor<D>> dataBinder) {
@@ -35,12 +36,11 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
 
             if (!myCurBound.isEmpty()) {
                 myCurBound.getValue().unbind();
-                // cannot be null?
                 myCurBound.setValue(null);
             }
 
             if (newCtx != null) {
-                myCurBound.setValue(new BoundLiveTemplate<>(newCtx, dataBinder, myUserReplaceHandlers, myInternalReplaceHandlers));
+                myCurBound.setValue(new BoundLiveTemplate<>(newCtx, this, dataBinder, myUserReplaceHandlers, myInternalReplaceHandlers, useDiffMatchPatch));
             }
         });
 
@@ -61,6 +61,12 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
     @Override
     public Var<D> dataContextProperty() {
         return myDataContext;
+    }
+
+
+    @Override
+    public Var<Boolean> isUseDiffMatchPatchStrategyProperty() {
+        return useDiffMatchPatch;
     }
 
 
@@ -91,6 +97,15 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
     @Override
     public void removeObserver(Consumer<? super String> observer) {
         myDelegateStringVal.removeObserver(observer);
+    }
+
+
+    /**
+     * Copies the configuration of the given template into this one one.
+     * User replace handlers are not copied.
+     */
+    void importConfigFrom(LiveTemplate<?> liveTemplate) {
+        this.setUseDiffMatchPatchStrategy(liveTemplate.isUseDiffMatchPatchStrategy());
     }
 
 }

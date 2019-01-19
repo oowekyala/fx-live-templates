@@ -40,6 +40,46 @@ class ReplaceHandlerTest : FunSpec({
 
     }
 
+    test("Test replacement with diff match patch strategy") {
+        class DContext {
+            val name = Var.newSimpleVar("MissingOverride")
+        }
+
+        val lt = LiveTemplate
+                .builder<DContext>()
+                .append("Foo[")
+                .bind { it.name }
+                .append("]bar")
+                .toTemplate()
+
+        lt.isUseDiffMatchPatchStrategy = true
+        val extSb = StringBuilder()
+
+        val events = mutableListOf<ReplaceEvent>()
+
+        lt.addReplaceHandler { start, end, value -> extSb.replace(start, end, value) }
+        lt.addReplaceHandler { start, end, value ->
+            events += ReplaceEvent(start, end, value)
+        }
+        lt.value shouldBe null
+
+        val dc = DContext()
+        lt.dataContext = dc
+        lt.value shouldBe "Foo[MissingOverride]bar"
+        extSb.toString() shouldBe "Foo[MissingOverride]bar"
+
+        events should haveSize(1)
+
+        dc.name.value = "MissingYou"
+
+        lt.value shouldBe "Foo[MissingYou]bar"
+        extSb.toString() shouldBe "Foo[MissingYou]bar"
+
+        events should haveSize(2)
+        events.last() shouldBe ReplaceEvent(11, 19, "You")
+    }
+
+
     test("Test replacement in external stringbuilder") {
         class DContext {
             val name = Var.newSimpleVar("MissingOverride")
@@ -338,6 +378,8 @@ class ReplaceHandlerTest : FunSpec({
         lt.addReplaceHandler { start, end, value ->
             events += ReplaceEvent(start, end, value)
         }
+
+        lt.isUseDiffMatchPatchStrategy = false
 
         lt.value shouldBe null
 

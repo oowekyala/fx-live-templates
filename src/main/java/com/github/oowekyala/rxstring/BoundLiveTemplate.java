@@ -3,15 +3,19 @@ package com.github.oowekyala.rxstring;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
-import java.util.logging.Level;
+import java.util.function.BiConsumer;
 
 import org.reactfx.EventSource;
 import org.reactfx.Subscription;
 import org.reactfx.collection.LiveList;
 import org.reactfx.value.Val;
 import org.reactfx.value.ValBase;
+import org.reactfx.value.Var;
+
+import com.github.oowekyala.rxstring.diff_match_patch.Patch;
 
 
 /**
@@ -54,12 +58,18 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     private final List<ReplaceHandler> myInternalReplaceHandlers;
     private final boolean isInitialized;
 
+    private final LiveTemplate<D> myParent;
 
     BoundLiveTemplate(D dataContext,
+                      LiveTemplate<D> parent,
                       List<BindingExtractor<D>> bindings,
                       List<ReplaceHandler> userReplaceHandler,
-                      List<ReplaceHandler> internalReplaceHandlers) {
+                      List<ReplaceHandler> internalReplaceHandlers,
+                      Var<Boolean> useDiffMatchPatch) {
+
         Objects.requireNonNull(dataContext);
+
+        this.myParent = parent;
 
         // the size of these is absolutely constant
         this.myOuterOffsets = new int[bindings.size()];
@@ -80,7 +90,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         this.isInitialized = true;
         this.myCurCtxSubscription = subscription;
 
-        myUserHandler.forEach(h -> safeHandlerCall(h, 0, 0, myStringBuffer.toString()));
+        myUserHandler.stream().map(ReplaceHandler::unfailing).forEach(h -> h.replace(0, 0, myStringBuffer.toString()));
     }
 
 
@@ -113,17 +123,36 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     // for construction
 
 
+    private BiConsumer<ReplaceHandler, Boolean> getReplacementStrategy(int start, int end, String value) {
+        if (myParent.isUseDiffMatchPatchStrategy()) {
+            DiffMatchPatchWithHooks dmp = new DiffMatchPatchWithHooks();
+            String prevSlice = myStringBuffer.substring(start, end);
+
+            // the ordering of the unfailing() calls affects output line numbers and stuff
+
+            if (!prevSlice.isEmpty()) {
+                LinkedList<Patch> patches = dmp.patchMake(prevSlice, value);
+                return (base, unsafe) -> dmp.patchApply(patches, prevSlice, base.withOffset(start).unfailing(unsafe));
+            } // else return the normal callback
+        }
+
+        return (base, unsafe) -> base.unfailing(unsafe).replace(start, end, value);
+    }
+
+
     private void handleContentChange(ValIdx valIdx, int start, int end, String value) {
-        myStringBuffer.replace(start, end, value);
+        BiConsumer<ReplaceHandler, Boolean> replacementStrategy = getReplacementStrategy(start, end, value);
+
+        replacementStrategy.accept(myStringBuffer::replace, false);
 
         // propagate the change to the templates that contain this one
-        myInternalReplaceHandlers.forEach(h -> h.replace(start, end, value));
+        myInternalReplaceHandlers.forEach(h -> replacementStrategy.accept(h, false));
 
         valIdx.propagateOffsetShift(value.length() - (end - start));
 
         if (isInitialized) {
             myInvalidations.push(null);
-            myUserHandler.forEach(h -> safeHandlerCall(h, start, end, value));
+            myUserHandler.forEach(h -> replacementStrategy.accept(h, true));
         }
     }
 
@@ -154,7 +183,8 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
         handleContentChange(valIdx, abs, abs, initialValue == null ? "" : initialValue);
 
-        return origin.bindSingleVal(stringSource,
+        return origin.bindSingleVal(myParent,
+                                    stringSource,
                                     valIdx::currentAbsoluteOffset,
                                     (start, end, value) -> handleContentChange(valIdx, start, end, value))
                      // part of the subscription
@@ -186,14 +216,5 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         }
 
         return valIdx;
-    }
-
-
-    private static void safeHandlerCall(ReplaceHandler h, int start, int end, String value) {
-        try {
-            h.replace(start, end, value);
-        } catch (Exception e) {
-            LiveTemplate.LOGGER.log(Level.WARNING, e, () -> "An exception was thrown by an external replacement handler");
-        }
     }
 }

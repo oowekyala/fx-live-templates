@@ -96,6 +96,33 @@ public interface LiveTemplate<D> extends Val<String> {
 
 
     /**
+     * Whether to use a diff-match-patch algorithm to patch only
+     * the smallest changes we can find. If false, when a variable
+     * changes, its whole value will be replaced in the text.
+     */
+    Var<Boolean> isUseDiffMatchPatchStrategyProperty();
+
+
+    /**
+     * Sets {@link #isUseDiffMatchPatchStrategyProperty()} to the given
+     * value.
+     *
+     * @param bool Whether to use a patch strategy or not
+     */
+    default void setUseDiffMatchPatchStrategy(boolean bool) {
+        isUseDiffMatchPatchStrategyProperty().setValue(bool);
+    }
+
+
+    /**
+     * Returns the current value of {@link #isUseDiffMatchPatchStrategyProperty()}.
+     */
+    default boolean isUseDiffMatchPatchStrategy() {
+        return isUseDiffMatchPatchStrategyProperty().getValue();
+    }
+
+
+    /**
      * Returns a builder for a new live template.
      *
      * @param <D> Type of the returned builder

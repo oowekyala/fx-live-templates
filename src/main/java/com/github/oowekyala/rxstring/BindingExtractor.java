@@ -31,12 +31,18 @@ interface BindingExtractor<D> {
      * is just supposed to stop observing the val and not cleanup.
      */
     // on pourrait dispatcher mais ballec
-    default Subscription bindSingleVal(Val<String> val, Supplier<Integer> absoluteOffset, ReplaceHandler callback) {
+    default Subscription bindSingleVal(LiveTemplate<?> parent,
+                                       Val<String> val,
+                                       Supplier<Integer> absoluteOffset,
+                                       ReplaceHandler callback) {
 
         if (val instanceof LiveTemplateImpl) {
 
             LiveTemplateImpl<?> subTemplate = (LiveTemplateImpl<?>) val;
 
+            // the subtemplate inherits some config properties from its outer parents,
+            // eg whether to use a patch strategy
+            subTemplate.importConfigFrom(parent);
             // add a replace handler to the bound value of the child
 
             ReplaceHandler subHandler = (relativeStart, relativeEnd, value) -> {
@@ -63,7 +69,8 @@ interface BindingExtractor<D> {
                       .changes()
                       .subscribe(change -> {
                           int startOffset = absoluteOffset.get();
-                          int endOffset = startOffset + change.getOldValue().length();callback.replace(startOffset, endOffset, change.getNewValue());
+                          int endOffset = startOffset + change.getOldValue().length();
+                          callback.replace(startOffset, endOffset, change.getNewValue());
                       });
         }
     }
