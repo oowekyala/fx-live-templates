@@ -529,7 +529,7 @@ class diff_match_patch {
         // collide with the reverse path.
         boolean front = (delta % 2 != 0);
         // Offsets for start and end of k loop.
-        // Prevents mapping of space beyond the grid.
+        // Prevents asString of space beyond the grid.
         int k1start = 0;
         int k1end = 0;
         int k2start = 0;
