@@ -33,12 +33,18 @@ public interface ReplaceHandler {
     }
 
 
-    default ReplaceHandler unfailing(boolean bool) {
-        return bool ? unfailing() : this;
+    /**
+     * If the parameter is true, returns {@link #unfailing()},
+     * otherwise returns this handler.
+     *
+     * @param canFail Whether to use an unfailing
+     */
+    default ReplaceHandler unfailing(boolean canFail) {
+        return canFail ? unfailing() : this;
     }
 
 
-    /** Returns a handler that can never throw exceptions. */
+    /** Returns a wrapper around this handler that can never throw exceptions. */
     default ReplaceHandler unfailing() {
         return (start, end, value) -> {
             try {

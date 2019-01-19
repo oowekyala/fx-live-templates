@@ -6,14 +6,12 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.BiConsumer;
 
 import org.reactfx.EventSource;
 import org.reactfx.Subscription;
 import org.reactfx.collection.LiveList;
 import org.reactfx.value.Val;
 import org.reactfx.value.ValBase;
-import org.reactfx.value.Var;
 
 import com.github.oowekyala.rxstring.diff_match_patch.Patch;
 
@@ -29,7 +27,7 @@ import com.github.oowekyala.rxstring.diff_match_patch.Patch;
  * * Each inner list can have different lengths. Only SeqBindings have length > 1
  * * We keep track of the text offsets of each inner list in myOuterOffsets
  * * Additionally, each inner list keeps track of the text offsets of its individual elements
- * relative to its own start in the document. This is tracked with {@link ValIdx} because since
+ * relative to the start of the list in the document. This is tracked with {@link ValIdx} because since
  * elements may be inserted or removed they're hard to keep tabs on without reifying them
  * * When a Val changes (say in the inner list [i][j]), the absolute offset in the
  * document where we want to perform the replacement is myOuterOffsets[i] + mySequences[i][j].
@@ -43,6 +41,7 @@ import com.github.oowekyala.rxstring.diff_match_patch.Patch;
 final class BoundLiveTemplate<D> extends ValBase<String> {
 
     // Represents the offsets of each outer binding
+    // this is shared with all the ValIdx spawned by this object
     private final int[] myOuterOffsets;
     // Represents the items of the individual sequences. The
     // shifts incurred by insertions into the
@@ -58,14 +57,15 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     private final List<ReplaceHandler> myInternalReplaceHandlers;
     private final boolean isInitialized;
 
+    /** The template that spawned this bound template. */
     private final LiveTemplate<D> myParent;
+
 
     BoundLiveTemplate(D dataContext,
                       LiveTemplate<D> parent,
                       List<BindingExtractor<D>> bindings,
                       List<ReplaceHandler> userReplaceHandler,
-                      List<ReplaceHandler> internalReplaceHandlers,
-                      Var<Boolean> useDiffMatchPatch) {
+                      List<ReplaceHandler> internalReplaceHandlers) {
 
         Objects.requireNonNull(dataContext);
 
@@ -123,7 +123,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     // for construction
 
 
-    private BiConsumer<ReplaceHandler, Boolean> getReplacementStrategy(int start, int end, String value) {
+    private ReplacementStrategy getReplacementStrategy(int start, int end, String value) {
         if (myParent.isUseDiffMatchPatchStrategy()) {
             DiffMatchPatchWithHooks dmp = new DiffMatchPatchWithHooks();
             String prevSlice = myStringBuffer.substring(start, end);
@@ -132,27 +132,27 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
             if (!prevSlice.isEmpty()) {
                 LinkedList<Patch> patches = dmp.patchMake(prevSlice, value);
-                return (base, unsafe) -> dmp.patchApply(patches, prevSlice, base.withOffset(start).unfailing(unsafe));
+                return (base, canFail) -> dmp.patchApply(patches, prevSlice, base.withOffset(start).unfailing(canFail));
             } // else return the normal callback
         }
 
-        return (base, unsafe) -> base.unfailing(unsafe).replace(start, end, value);
+        return (base, canFail) -> base.unfailing(canFail).replace(start, end, value);
     }
 
 
     private void handleContentChange(ValIdx valIdx, int start, int end, String value) {
-        BiConsumer<ReplaceHandler, Boolean> replacementStrategy = getReplacementStrategy(start, end, value);
+        ReplacementStrategy replacementStrategy = getReplacementStrategy(start, end, value);
 
-        replacementStrategy.accept(myStringBuffer::replace, false);
+        replacementStrategy.apply(myStringBuffer::replace, false);
 
         // propagate the change to the templates that contain this one
-        myInternalReplaceHandlers.forEach(h -> replacementStrategy.accept(h, false));
+        myInternalReplaceHandlers.forEach(h -> replacementStrategy.apply(h, false));
 
         valIdx.propagateOffsetShift(value.length() - (end - start));
 
         if (isInitialized) {
             myInvalidations.push(null);
-            myUserHandler.forEach(h -> replacementStrategy.accept(h, true));
+            myUserHandler.forEach(h -> replacementStrategy.apply(h, true));
         }
     }
 
@@ -173,11 +173,8 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     private Subscription initVal(BindingExtractor<D> origin, Val<String> stringSource, int outerIdx, int innerIdx) {
         // sequence bindings will call this method when their content has changed
 
-        // this thing is captured which allows its index to remain up to date
+        // this thing is captured which allows its indices to remain up to date
         ValIdx valIdx = insertBindingAt(outerIdx, innerIdx);
-
-        LiveTemplate.LOGGER.finest(() -> "Initializing an elt at " + valIdx);
-
         String initialValue = stringSource.getValue();
         int abs = valIdx.currentAbsoluteOffset();
 
@@ -188,11 +185,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
                                     valIdx::currentAbsoluteOffset,
                                     (start, end, value) -> handleContentChange(valIdx, start, end, value))
                      // part of the subscription
-                     .and(() -> {
-                         LiveTemplate.LOGGER.finest(() -> "Deleting an elt at " + valIdx);
-
-                         deleteBindingAt(valIdx);
-                     });
+                     .and(() -> deleteBindingAt(valIdx));
     }
 
 
@@ -207,14 +200,13 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
 
     private ValIdx insertBindingAt(int outerIdx, int innerIdx) {
-        ValIdx valIdx = new ValIdx(myOuterOffsets, myStringBuffer, outerIdx, innerIdx, mySequences.get(outerIdx), !isInitialized);
+        return new ValIdx(myOuterOffsets, myStringBuffer, outerIdx, innerIdx, mySequences.get(outerIdx), !isInitialized);
+    }
 
-        if (!isInitialized) {
-            // initialisation pass is special for now
-            valIdx.relativeOffset = myStringBuffer.length() - myOuterOffsets[outerIdx];
-            return valIdx;
-        }
 
-        return valIdx;
+    @FunctionalInterface
+    private interface ReplacementStrategy {
+        /** Applies the given replace handler. */
+        void apply(ReplaceHandler handler, boolean logExceptionsButDontFail);
     }
 }

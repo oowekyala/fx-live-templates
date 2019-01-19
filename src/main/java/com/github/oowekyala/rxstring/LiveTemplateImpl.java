@@ -40,7 +40,7 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
             }
 
             if (newCtx != null) {
-                myCurBound.setValue(new BoundLiveTemplate<>(newCtx, this, dataBinder, myUserReplaceHandlers, myInternalReplaceHandlers, useDiffMatchPatch));
+                myCurBound.setValue(new BoundLiveTemplate<>(newCtx, this, dataBinder, myUserReplaceHandlers, myInternalReplaceHandlers));
             }
         });
 

@@ -18,3 +18,11 @@ internal class TestLogHandler : Handler() {
     override fun close() {}
     override fun flush() {}
 }
+
+/**
+ * Object describing a replacement that has occurred inside a live template
+ * because of a change in a bound value.
+ *
+ * @author Clément Fournier
+ */
+internal data class ReplaceEvent(val startIndex: Int, val endIndex: Int, val value: String)

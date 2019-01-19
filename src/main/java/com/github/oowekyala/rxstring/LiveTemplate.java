@@ -98,7 +98,7 @@ public interface LiveTemplate<D> extends Val<String> {
     /**
      * Whether to use a diff-match-patch algorithm to patch only
      * the smallest changes we can find. If false, when a variable
-     * changes, its whole value will be replaced in the text.
+     * changes, its whole value will be replaced in the previous text.
      */
     Var<Boolean> isUseDiffMatchPatchStrategyProperty();
 
