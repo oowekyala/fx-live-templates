@@ -11,6 +11,9 @@ import javafx.beans.value.ObservableValue;
 /**
  * A type used to render objects of type T in a template.
  *
+ * TODO make item renderers config-sensitive
+ * TODO add indented() item renderer
+ *
  * @param <T> Type of values to map
  */
 public class ItemRenderer<T> implements Function<T, Val<String>> {
@@ -85,6 +88,17 @@ public class ItemRenderer<T> implements Function<T, Val<String>> {
     }
 
 
+    /**
+     * Returns a renderer that surrounds its item with the given prefix and suffix. The given
+     * renderer is used to display the item.
+     *
+     * @param renderer Base renderer
+     * @param prefix   Prefix
+     * @param suffix   Suffix
+     * @param <T>      Type of items to render
+     *
+     * @return A new renderer
+     */
     public static <T> ItemRenderer<T> surrounded(ItemRenderer<T> renderer, String prefix, String suffix) {
         return templated(null, b -> b.append(prefix).render(Function.identity(), renderer).append(suffix));
     }

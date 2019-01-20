@@ -30,15 +30,14 @@ interface BindingExtractor<D> {
                                        Val<String> val,
                                        ValIdx valIdx,
                                        ReplaceHandler callback) {
+        String initialValue = val.getValue();
 
         if (previous == null) {
-            String initialValue = val.getValue();
             // insert it whole
             callback.replace(0, 0, initialValue == null ? "" : initialValue);
         }
 
         Subscription sub = null;
-
         if (val instanceof LiveTemplateImpl) {
             LiveTemplateImpl<?> subTemplate = (LiveTemplateImpl<?>) val;
 
@@ -75,12 +74,12 @@ interface BindingExtractor<D> {
         }
 
         if (previous != null) {
-            String initialValue = val.getValue();
+            valIdx.signalDontDelete();
             int prevLength = valIdx.length();
             // replace previous
             callback.replace(0, prevLength, initialValue == null ? "" : initialValue);
-
         }
+
         return sub;
     }
 

@@ -22,6 +22,7 @@ final class ValIdx implements Comparable<ValIdx> {
     /** Index in the parent list. Shifted when elements are inserted to the left. */
     private int innerIdx;
     private int[] myOuterOffsets;
+    private boolean shouldDelete = true;
 
 
     ValIdx(int[] myOuterOffsets,
@@ -98,12 +99,20 @@ final class ValIdx implements Comparable<ValIdx> {
     }
 
 
-    void delete() {
-        // todo when destroying a whole template this is unnecessarily complex
-        // propagate the shift before removing, otherwise we're
-        // missing the right sibling
-        propagateItemShift(-1);
-        parent.remove(innerIdx);
+    void delete(ReplaceHandler handler) {
+        if (shouldDelete) {
+            handler.replace(0, length(), "");
+
+            // propagate the shift before removing, otherwise we're
+            // missing the right sibling
+            propagateItemShift(-1);
+            parent.remove(innerIdx);
+        }
+    }
+
+
+    void signalDontDelete() {
+        this.shouldDelete = false;
     }
 
 

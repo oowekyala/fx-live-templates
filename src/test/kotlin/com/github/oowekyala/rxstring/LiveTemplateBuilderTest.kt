@@ -349,6 +349,8 @@ class LiveTemplateBuilderTest : FunSpec({
             <top name='foo'/>
         """.trimIndent()
 
+        events.last() shouldBe ReplaceEvent(11, 14, "foo")
+
         lt.dataContext.name.value = null
 
         lt.value shouldBe """

@@ -122,11 +122,12 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         for (int i = 0; i < myOuterOffsets.length; i++) {
             // only reevaluate the thing if it's not constant
             if (!myConstantIndices[i]) {
-                if (mySequenceSubscriptions.get(i) != null) {
-                    mySequenceSubscriptions.get(i).unsubscribe();
-                }
                 Subscription subToNewCtx = initSequence(dataContext, handlers, myBindings.get(i), i, isRebind);
-                mySequenceSubscriptions.set(i, subToNewCtx);
+                Subscription oldSub = mySequenceSubscriptions.set(i, subToNewCtx);
+                if (oldSub != null) {
+                    // unsubscribing after, so that signalDontDelete happens before
+                    oldSub.unsubscribe();
+                }
             }
         }
     }
@@ -238,30 +239,20 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         // this thing is captured which allows its indices to remain up to date
         ValIdx valIdx = insertBindingAt(outerIdx, innerIdx, previous != null);
 
-        ReplaceHandler relativeToVal = (start, end, value) -> handleContentChange(valIdx, handlers, start, end, value);
-
-        boolean shouldDelete = true;//previous == null || !Objects.equals(previous.getValue(), stringSource.getValue());
+        ReplaceHandler base = (start, end, value) -> handleContentChange(valIdx, handlers, start, end, value);
+        final ReplaceHandler relativeToVal = base.withOffset(valIdx::currentAbsoluteOffset);
 
         return origin.bindSingleVal(myParent,
                                     previous,
                                     stringSource,
                                     valIdx,
-                                    relativeToVal.withOffset(valIdx::currentAbsoluteOffset))
-                     .and(() -> {
-                         if (shouldDelete) {
-                             deleteBindingAt(valIdx, handlers);
-                         }
-                     });
+                                    relativeToVal)
+                     .and(() -> deleteBindingAt(valIdx, relativeToVal));
     }
 
 
-    private void deleteBindingAt(ValIdx idx, Handlers handlers) {
-
-        int start = idx.currentAbsoluteOffset();
-        int deletedLength = idx.length();
-        handleContentChange(idx, handlers, start, start + deletedLength, "");
-
-        idx.delete();
+    private void deleteBindingAt(ValIdx idx, ReplaceHandler replaceHandler) {
+        idx.delete(replaceHandler);
     }
 
 
