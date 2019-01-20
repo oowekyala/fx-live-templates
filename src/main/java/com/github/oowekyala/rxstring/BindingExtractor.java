@@ -41,25 +41,11 @@ interface BindingExtractor<D> {
             subTemplate.importConfigFrom(parent);
             // add a replace handler to the bound value of the child
 
-            ReplaceHandler subHandler = (relativeStart, relativeEnd, value) -> {
-                int absolute = absoluteOffset.get();
-
-                callback.replace(
-                    // the offsets here must be offset by the start of the subtemplate
-                    absolute + relativeStart,
-                    absolute + relativeEnd,
-                    value);
-            };
-
-            subTemplate.addInternalReplaceHandler(subHandler);
-
-            return () -> {
-                subTemplate.removeInternalReplaceHandler(subHandler);
-                subTemplate.dataContextProperty().unbind();
-                subTemplate.setDataContext(null);
-            };
-
-
+            return subTemplate.addInternalReplaceHandler(callback.withOffset(absoluteOffset))
+                              .and(() -> {
+                                  subTemplate.dataContextProperty().unbind();
+                                  subTemplate.setDataContext(null);
+                              });
         } else {
             return val.orElseConst("") // so that the values in changes are never null
                       .changes()

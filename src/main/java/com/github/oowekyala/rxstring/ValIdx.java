@@ -99,6 +99,7 @@ final class ValIdx implements Comparable<ValIdx> {
 
 
     void delete() {
+        // todo when destroying a whole template this is unnecessarily complex
         // propagate the shift before removing, otherwise we're
         // missing the right sibling
         propagateItemShift(-1);

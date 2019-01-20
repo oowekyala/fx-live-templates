@@ -1,5 +1,6 @@
 package com.github.oowekyala.rxstring;
 
+import java.util.function.Supplier;
 import java.util.logging.Level;
 
 
@@ -30,6 +31,18 @@ public interface ReplaceHandler {
      */
     default ReplaceHandler withOffset(int offset) {
         return (s, e, v) -> replace(s + offset, e + offset, v);
+    }
+
+
+    /**
+     * Returns a new replace handler based on this one
+     * but whose parameters are offset by the given constant.
+     */
+    default ReplaceHandler withOffset(Supplier<Integer> offsetSupplier) {
+        return (s, e, v) -> {
+            int offset = offsetSupplier.get();
+            replace(s + offset, e + offset, v);
+        };
     }
 
 

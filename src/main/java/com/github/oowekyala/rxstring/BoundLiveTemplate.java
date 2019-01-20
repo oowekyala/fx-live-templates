@@ -13,7 +13,7 @@ import org.reactfx.value.Val;
 import org.reactfx.value.ValBase;
 
 import com.github.oowekyala.rxstring.diff_match_patch.Patch;
-import javafx.collections.transformation.FilteredList;
+import javafx.collections.ObservableList;
 
 
 /**
@@ -82,7 +82,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
         for (int i = 0; i < myOuterOffsets.length; i++) {
             subscription = subscription.and(
-                initBinding(dataContext, bindings.get(i), i)
+                initSequence(dataContext, bindings.get(i), i)
             );
         }
 
@@ -192,10 +192,14 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     }
 
 
-    private Subscription initBinding(D context, BindingExtractor<D> bindingExtractor, int outerIdx) {
+    /**
+     * Initialises the whole sequence at index outerIdx. Returns the subscription that unsubscribes
+     * all elements of the sequence.
+     */
+    private Subscription initSequence(D context, BindingExtractor<D> bindingExtractor, int outerIdx) {
         myOuterOffsets[outerIdx] = myStringBuffer.length();
 
-        FilteredList<Val<String>> lst = bindingExtractor.extract(context).filtered(v -> !isIgnorable(v));
+        ObservableList<Val<String>> lst = bindingExtractor.extract(context).filtered(v -> !isIgnorable(v));
         mySequences.set(outerIdx, new ArrayList<>(lst.size()));
 
         return ReactfxUtil.dynamic(lst, (elt, innerIdx) -> initVal(bindingExtractor, elt, outerIdx, innerIdx));

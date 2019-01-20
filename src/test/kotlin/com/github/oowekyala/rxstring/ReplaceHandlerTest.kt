@@ -446,6 +446,63 @@ class ReplaceHandlerTest : FunSpec({
     }
 
 
+    test("Test nested template context switch event") {
+
+        class SubDContext {
+            val name = Var.newSimpleVar("sub")
+            val num = Var.newSimpleVar(4)
+        }
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+            val sub = Var.newSimpleVar(SubDContext())
+        }
+
+        val lt = LiveTemplate
+                .newBuilder<DContext>()
+                .append("<top name='").bind { it.name }.appendLine("'>")
+                .bindTemplate({ it.sub }) { sub ->
+                    sub.append("<sub name='").bind { it.name }.append("' num='").bind { it.num }.appendLine("'/>")
+                }
+                .append("</top>")
+                .toTemplate()
+
+        val events = mutableListOf<ReplaceEvent>()
+
+        lt.addReplaceHandler(recordEvents(events))
+
+        lt.value shouldBe null
+
+        val dc = DContext()
+        lt.dataContext = dc
+
+        val afterValue1 = """
+            <top name='top'>
+            <sub name='sub' num='4'/>
+            </top>
+        """.trimIndent()
+
+        lt.value shouldBe afterValue1
+
+        events should haveSize(1)
+        events.last() shouldBe ReplaceEvent(0, 0, afterValue1)
+
+        lt.dataContext.sub.value = SubDContext() // context switch
+
+        lt.value shouldBe """
+            <top name='top'>
+            <sub name='sub' num='4'/>
+            </top>
+        """.trimIndent()
+
+        events should haveSize(3)
+        // FIXME we should infer that there was no change in the constants somehow
+        events[events.size - 2] shouldBe ReplaceEvent(17, 43, "")
+        events.last() shouldBe ReplaceEvent(17, 17, "<sub name='sub' num='4'/>\n")
+
+    }
+
+
     test("Test nested template sequence minimal change") {
 
         class SubDContext {
