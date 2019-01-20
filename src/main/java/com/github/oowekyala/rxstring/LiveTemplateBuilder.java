@@ -205,6 +205,36 @@ public interface LiveTemplateBuilder<D> {
 
 
     /**
+     * Renders a value of the data context with a sub-template. The sub-template will
+     * update automatically based on the change in properties of the extracted data
+     * context. The data context itself can never change though (see {@linkplain #bindTemplate(Function, Consumer)}
+     * if your data context may change).
+     *
+     * <p>It's recommended to use a sub-template when the value's string representation
+     * has many string constants that don't depend on changes in the value's state, or
+     * when it depends on several independent observable values. With a sub-template, the
+     * changes to the string value will be scoped down to the individual changes in the
+     * properties of the sub context, which improves the resolution of the external handler calls.
+     *
+     * @param extractor          Extracts the data context of the sub-template from the data context
+     *                           of this template
+     * @param subTemplateBuilder A function side-effecting on the builder of the sub-template
+     *                           to configure it
+     * @param <T>                Type of the data context for the sub-template
+     *
+     * @return This builder
+     *
+     * @see #bind(Function, ItemRenderer)
+     * @see #bindTemplate(Function, Consumer)
+     * @see #bindTemplatedSeq(Function, Consumer)
+     */
+    default <T> LiveTemplateBuilder<D> renderTemplate(Function<? super D, ? extends T> extractor,
+                                                      Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
+        return render(extractor, ItemRenderer.templated(this, subTemplateBuilder));
+    }
+
+
+    /**
      * Binds a property of the data context to be rendered with {@link Object#toString()}.
      * If the object is null, value has a null value, the empty string will be used.
      *
@@ -262,11 +292,8 @@ public interface LiveTemplateBuilder<D> {
      * The value of the property will be used as the data context of the sub template.
      * When the property has a null value, the empty string is rendered instead.
      *
-     * <p>It's recommended to use a sub-template when the value's string representation
-     * has many string constants that don't depend on changes in the value's state, or
-     * when it depends on several independent observable values. With a sub-template, the
-     * changes to the string value will be scoped down to the individual changes in the
-     * properties of the sub context, which improves the resolution of the external handler calls.
+     * <p>This difference from {@link #renderTemplate(Function, Consumer)} is that the
+     * data context itself may change.
      *
      * @param extractor          Extracts an observable value representing the
      *                           data context of the sub-template
@@ -276,6 +303,8 @@ public interface LiveTemplateBuilder<D> {
      *
      * @return This builder
      *
+     * @see #renderTemplate(Function, Consumer)
+     * @see #bindTemplatedSeq(Function, Consumer)
      * @see #bind(Function, ItemRenderer)
      */
     default <T> LiveTemplateBuilder<D> bindTemplate(Function<? super D, ? extends ObservableValue<T>> extractor,
