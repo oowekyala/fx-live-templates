@@ -6,6 +6,9 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import org.reactfx.EventSource;
+import org.reactfx.EventStream;
+import org.reactfx.EventStreams;
 import org.reactfx.value.Val;
 import org.reactfx.value.Var;
 
@@ -28,6 +31,8 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
     private final List<ReplaceHandler> myInternalReplaceHandlers = new ArrayList<>();
     private final List<ReplaceHandler> myUserReplaceHandlers = new ArrayList<>();
     private final Var<Boolean> useDiffMatchPatch = Var.newSimpleVar(true);
+    private final EventSource<RxTextChange> exceptionalTextChanges = new EventSource<>();
+    private final EventStream<RxTextChange> myChanges = EventStreams.merge(myCurBound.values().filter(Objects::nonNull).flatMap(BoundLiveTemplate::textChanges), exceptionalTextChanges);
 
 
     LiveTemplateImpl(List<BindingExtractor<D>> dataBinder) {
@@ -35,11 +40,12 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
         myDataContext.values().subscribe(newCtx -> {
 
             if (!myCurBound.isEmpty()) {
-                myCurBound.getValue().unbind();
+                myCurBound.getValue().unbind(exceptionalTextChanges);
             }
 
             if (newCtx != null) {
-                myCurBound.setValue(new BoundLiveTemplate<>(newCtx, this, dataBinder, myUserReplaceHandlers, myInternalReplaceHandlers));
+
+                myCurBound.setValue(new BoundLiveTemplate<>(newCtx, this, dataBinder, myUserReplaceHandlers, exceptionalTextChanges, myInternalReplaceHandlers));
             } else {
                 myCurBound.setValue(null);
             }
@@ -98,6 +104,12 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
     @Override
     public void removeObserver(Consumer<? super String> observer) {
         myDelegateStringVal.removeObserver(observer);
+    }
+
+
+    @Override
+    public EventStream<RxTextChange> textChanges() {
+        return myChanges;
     }
 
 

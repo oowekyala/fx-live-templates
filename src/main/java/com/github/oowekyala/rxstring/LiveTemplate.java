@@ -2,6 +2,7 @@ package com.github.oowekyala.rxstring;
 
 import java.util.logging.Logger;
 
+import org.reactfx.EventStream;
 import org.reactfx.value.Val;
 import org.reactfx.value.Var;
 
@@ -40,8 +41,7 @@ public interface LiveTemplate<D> extends Val<String> {
 
     /**
      * Rebinds this template to the given data context. If null, then just unbinds the current
-     * data context, if any, and sets this value to empty. The {@linkplain #addReplaceHandler(ReplaceHandler)
-     * replacement handlers} are also called when unbinding to perform deletions.
+     * data context, if any, and sets this value to empty.
      *
      * <p>When setting the data context to a non-null value, the {@linkplain #getValue() value}
      * of this Val passes from its previous state to the full text bound to the new data context.
@@ -98,6 +98,7 @@ public interface LiveTemplate<D> extends Val<String> {
      *
      * @throws NullPointerException if the given handler is null
      */
+    @Deprecated
     void addReplaceHandler(ReplaceHandler handler);
 
 
@@ -106,6 +107,7 @@ public interface LiveTemplate<D> extends Val<String> {
      *
      * @param handler handler to remove
      */
+    @Deprecated
     void removeReplaceHandler(ReplaceHandler handler);
 
 
@@ -137,7 +139,34 @@ public interface LiveTemplate<D> extends Val<String> {
 
 
     /**
-     * Returns a builder for a new live template.
+     * Returns a stream of replacement events. An event is pushed every
+     * time a change in the bound properties (or in data context) causes
+     * a change in the string value of this template.
+     *
+     * <p>This can be used for example to update an external presentation
+     * layer, e.g. a {@link javafx.scene.control.TextArea} or similar,
+     * without replacing the whole text each time.
+     *
+     * <p>A single event is pushed when changing the data context. If the
+     * data context is set to a non-null value, the event has the form
+     * {@code RxTextChange(0, 0, text(dc))}, where {@code text(dc)} is the
+     * whole evaluated value of the template. If the data context is set
+     * to null, the the event has the form {@code RxTextChange(0, text(dc).length, "")},
+     * which corresponds to a deletion of the entire previous value.
+     *
+     * <p>While a data context is bound, events are pushed with for the
+     * smallest changed ranges that could be inferred.
+     *
+     * <p>Exceptions thrown by subscribers are logged with {@link #LOGGER}
+     * but are not rethrown.
+     *
+     * @return A stream of replacement events
+     */
+    EventStream<RxTextChange> textChanges();
+
+
+    /**
+     * Returns a new builder for a live template.
      *
      * @param <D> Type of the returned builder
      *

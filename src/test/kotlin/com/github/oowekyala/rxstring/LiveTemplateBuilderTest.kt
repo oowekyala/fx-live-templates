@@ -35,8 +35,7 @@ class LiveTemplateBuilderTest : FunSpec({
 
         val extSb = StringBuilder()
 
-        val handler = ReplaceHandler { start, end, value -> extSb.replace(start, end, value) }
-        lt.addReplaceHandler(handler)
+        lt.textChanges().subscribe { extSb.replace(it.startIndex, it.endIndex, it.replacementText) }
         lt.value shouldBe null
 
         val dc = DContext()
@@ -72,8 +71,7 @@ class LiveTemplateBuilderTest : FunSpec({
 
         val extSb = StringBuilder()
 
-        val handler = ReplaceHandler { start, end, value -> extSb.replace(start, end, value) }
-        lt.addReplaceHandler(handler)
+        lt.textChanges().subscribe { extSb.replace(it.startIndex, it.endIndex, it.replacementText) }
         lt.value shouldBe null
 
         val dc = DContext()

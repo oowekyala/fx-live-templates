@@ -29,8 +29,7 @@ class ReplaceHandlerTest : FunSpec({
 
         val extSb = StringBuilder()
 
-        val handler = ReplaceHandler { start, end, value -> extSb.replace(start, end, value) }
-        lt.addReplaceHandler(handler)
+        lt.textChanges().subscribe { extSb.replace(it.startIndex, it.endIndex, it.replacementText) }
         lt.value shouldBe null
 
         val dc = DContext()
@@ -55,28 +54,26 @@ class ReplaceHandlerTest : FunSpec({
         lt.isUseDiffMatchPatchStrategy = true
         val extSb = StringBuilder()
 
-        val events = mutableListOf<ReplaceEvent>()
+        val events = mutableListOf<RxTextChange>()
 
-        lt.addReplaceHandler { start, end, value -> extSb.replace(start, end, value) }
-        lt.addReplaceHandler { start, end, value ->
-            events += ReplaceEvent(start, end, value)
-        }
+        lt.textChanges().subscribe { events += it }
+        lt.textChanges().subscribe { extSb.replace(it.startIndex, it.endIndex, it.replacementText) }
+
         lt.value shouldBe null
 
-        val dc = DContext()
-        lt.dataContext = dc
+        lt.dataContext = DContext()
         lt.value shouldBe "Foo[MissingOverride]bar"
         extSb.toString() shouldBe "Foo[MissingOverride]bar"
 
         events should haveSize(1)
 
-        dc.name.value = "MissingYou"
+        lt.dataContext.name.value = "MissingYou"
 
         lt.value shouldBe "Foo[MissingYou]bar"
         extSb.toString() shouldBe "Foo[MissingYou]bar"
 
         events should haveSize(2)
-        events.last() shouldBe ReplaceEvent(11, 19, "You")
+        events.last() shouldBe RxTextChange(11, 19, "You")
     }
 
 
@@ -94,8 +91,7 @@ class ReplaceHandlerTest : FunSpec({
 
         val extSb = StringBuilder()
 
-        val handler = ReplaceHandler { start, end, value -> extSb.replace(start, end, value) }
-        lt.addReplaceHandler(handler)
+        lt.textChanges().subscribe { extSb.replace(it.startIndex, it.endIndex, it.replacementText) }
         lt.value shouldBe null
 
         val dc = DContext()
@@ -124,8 +120,7 @@ class ReplaceHandlerTest : FunSpec({
 
         val extSb = StringBuilder()
 
-        val handler = ReplaceHandler { start, end, value -> extSb.replace(start, end, value) }
-        lt.addReplaceHandler(handler)
+        val sub = lt.textChanges().subscribe { extSb.replace(it.startIndex, it.endIndex, it.replacementText) }
         lt.value shouldBe null
 
         val dc = DContext()
@@ -134,7 +129,7 @@ class ReplaceHandlerTest : FunSpec({
         lt.value shouldBe "Foo[MissingOverride]bar"
         extSb.toString() shouldBe "Foo[MissingOverride]bar"
 
-        lt.removeReplaceHandler(handler)
+        sub.unsubscribe()
         dc.name.value = "HELLO"
 
         lt.value shouldBe "Foo[HELLO]bar"
@@ -158,8 +153,7 @@ class ReplaceHandlerTest : FunSpec({
 
         val extSb = StringBuilder()
 
-        val handler = ReplaceHandler { start, end, value -> extSb.replace(start, end, value) }
-        lt.addReplaceHandler(handler)
+        lt.textChanges().subscribe { extSb.replace(it.startIndex, it.endIndex, it.replacementText) }
         lt.value shouldBe null
 
         val dc = DContext()
@@ -197,8 +191,8 @@ class ReplaceHandlerTest : FunSpec({
 
         val extSb = StringBuilder()
 
-        lt.addReplaceHandler { start, end, value -> extSb.replace(start, end, value) }
-        lt.addReplaceHandler { _, _, _ -> throw IllegalStateException() }
+        lt.textChanges().subscribe { extSb.replace(it.startIndex, it.endIndex, it.replacementText) }
+        lt.textChanges().subscribe { throw java.lang.IllegalStateException() }
         lt.value shouldBe null
 
         val dc = DContext()
@@ -240,11 +234,9 @@ class ReplaceHandlerTest : FunSpec({
                 .append("</top>")
                 .toTemplate()
 
-        val events = mutableListOf<ReplaceEvent>()
+        val events = mutableListOf<RxTextChange>()
 
-        lt.addReplaceHandler { start, end, value ->
-            events += ReplaceEvent(start, end, value)
-        }
+        lt.textChanges().subscribe { events += it }
 
         lt.value shouldBe null
 
@@ -260,17 +252,17 @@ class ReplaceHandlerTest : FunSpec({
         lt.value shouldBe afterValue1
 
         events should haveSize(1)
-        events.last() shouldBe ReplaceEvent(0, 0, afterValue1)
+        events.last() shouldBe RxTextChange(0, 0, afterValue1)
 
         lt.dataContext.name.value = "foo"
 
         events should haveSize(2)
-        events.last() shouldBe ReplaceEvent(11, 14, "foo")
+        events.last() shouldBe RxTextChange(11, 14, "foo")
 
         lt.dataContext.sub.value.name.value = "foo"
 
         events should haveSize(3)
-        events.last() shouldBe ReplaceEvent(28, 31, "foo")
+        events.last() shouldBe RxTextChange(28, 31, "foo")
 
         lt.value shouldBe """
             <top name='foo'>
@@ -292,7 +284,7 @@ class ReplaceHandlerTest : FunSpec({
             val subs = FXCollections.observableArrayList(SubDContext())
         }
 
-        val events = mutableListOf<ReplaceEvent>()
+        val events = mutableListOf<RxTextChange>()
 
         val lt = LiveTemplate
                 .builder<DContext>()
@@ -301,7 +293,7 @@ class ReplaceHandlerTest : FunSpec({
                     sub.append("<sub name='").bind { it.name }.append("' num='").bind { it.num }.appendLine("'/>")
                 }
                 .append("</top>")
-                .toBoundTemplate(DContext(), ReplaceHandler { start, end, value -> events += ReplaceEvent(start, end, value) })
+                .toBoundTemplate(DContext(), ReplaceHandler { start, end, value -> events += RxTextChange(start, end, value) })
 
         lt.isUseDiffMatchPatchStrategy = false
 
@@ -314,17 +306,17 @@ class ReplaceHandlerTest : FunSpec({
         lt.value shouldBe afterValue1
 
         events should haveSize(1)
-        events.last() shouldBe ReplaceEvent(0, 0, afterValue1)
+        events.last() shouldBe RxTextChange(0, 0, afterValue1)
 
         lt.dataContext.name.value = "foo"
 
         events should haveSize(2)
-        events.last() shouldBe ReplaceEvent(11, 14, "foo")
+        events.last() shouldBe RxTextChange(11, 14, "foo")
 
         lt.dataContext.subs[0].name.value = "foo"
 
         events should haveSize(3)
-        events.last() shouldBe ReplaceEvent(28, 31, "foo")
+        events.last() shouldBe RxTextChange(28, 31, "foo")
 
         lt.value shouldBe """
             <top name='foo'>
@@ -342,7 +334,7 @@ class ReplaceHandlerTest : FunSpec({
         """.trimIndent()
 
         events should haveSize(4)
-        events.last() shouldBe ReplaceEvent(43, 43, "<sub name='sub' num='4'/>\n")
+        events.last() shouldBe RxTextChange(43, 43, "<sub name='sub' num='4'/>\n")
     }
 
     test("Test binding a nested template") {
@@ -366,11 +358,9 @@ class ReplaceHandlerTest : FunSpec({
                 .append("</top>")
                 .toTemplate()
 
-        val events = mutableListOf<ReplaceEvent>()
+        val events = mutableListOf<RxTextChange>()
 
-        lt.addReplaceHandler { start, end, value ->
-            events += ReplaceEvent(start, end, value)
-        }
+        lt.textChanges().subscribe { events += it }
 
         lt.isUseDiffMatchPatchStrategy = false
 
@@ -388,12 +378,12 @@ class ReplaceHandlerTest : FunSpec({
         lt.value shouldBe afterValue1
 
         events should haveSize(1)
-        events.last() shouldBe ReplaceEvent(0, 0, afterValue1)
+        events.last() shouldBe RxTextChange(0, 0, afterValue1)
 
         lt.dataContext.name.value = "foo"
 
         events should haveSize(2)
-        events.last() shouldBe ReplaceEvent(11, 14, "foo")
+        events.last() shouldBe RxTextChange(11, 14, "foo")
 
         val nameBinding = Var.newSimpleVar("bindSource")
         val numBinding = Var.newSimpleVar(10)
@@ -409,13 +399,13 @@ class ReplaceHandlerTest : FunSpec({
         """.trimIndent()
 
         events should haveSize(4)
-        events[2] shouldBe ReplaceEvent(28, 31, "bindSource")
-        events.last() shouldBe ReplaceEvent(45, 46, "10")
+        events[2] shouldBe RxTextChange(28, 31, "bindSource")
+        events.last() shouldBe RxTextChange(45, 46, "10")
 
         numBinding.value = 15
 
         events should haveSize(5)
-        events.last() shouldBe ReplaceEvent(45, 47, "15")
+        events.last() shouldBe RxTextChange(45, 47, "15")
 
         lt.value shouldBe """
             <top name='foo'>

@@ -27,7 +27,7 @@ import javafx.collections.ObservableList;
  * observable values themselves, so will only be rendered once.</li>
  * <li>Observable bindings: those will be extracted from the data context
  * at the time the template is bound. Each time a property of the data context
- * changes value, the template updates its string value and calls its {@linkplain LiveTemplate#addReplaceHandler(ReplaceHandler) replace handlers}.
+ * changes value, the template updates its string value and pushes a {@linkplain LiveTemplate#textChanges() text change}.
  * At the time of construction though, those are specified by an extraction
  * function, and a {@linkplain ItemRenderer rendering function}. Some rendering
  * functions are remarkable:
@@ -408,7 +408,7 @@ public interface LiveTemplateBuilder<D> {
     default LiveTemplate<D> toBoundTemplate(D dataContext, ReplaceHandler... replaceHandlers) {
         LiveTemplate<D> template = toTemplate();
         for (ReplaceHandler handler : replaceHandlers) {
-            template.addReplaceHandler(handler);
+            template.textChanges().subscribe(ch -> handler.replace(ch.getStartIndex(), ch.getEndIndex(), ch.getReplacementText()));
         }
         template.setDataContext(dataContext);
         return template;
