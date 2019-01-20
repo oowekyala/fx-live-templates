@@ -49,7 +49,7 @@ public interface LiveTemplate<D> extends Val<String> {
      * <pre>
      * data context:  ---null  d1--------------...--d1  d2--------d2   null  null
      * value:         ---null  text(d1)--------...--|   text(d2)--|    null------
-     * time:         >---|-----|---------------...--|---|---------|----|--------->
+     * time:         &gt;---|-----|---------------...--|---|---------|----|---------&gt;
      * </pre>
      *
      * @param context The new data context

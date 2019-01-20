@@ -55,10 +55,9 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     private final EventSource<?> myInvalidations = new EventSource<>();
     private final List<ReplaceHandler> myUserHandler;
     private final List<ReplaceHandler> myInternalReplaceHandlers;
-    private boolean isPushInvalidations;
-
     /** The template that spawned this bound template. */
     private final LiveTemplate<D> myParent;
+    private boolean isPushInvalidations;
 
 
     BoundLiveTemplate(D dataContext,
@@ -106,7 +105,12 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
 
     void unbind() {
-        myUserHandler.stream().map(ReplaceHandler::unfailing).forEach(h -> h.replace(0, myStringBuffer.length(), ""));
+        int myLength = myStringBuffer.length();
+        // notify user subscribers that everything was deleted
+        myUserHandler.stream().map(ReplaceHandler::unfailing).forEach(h -> h.replace(0, myLength, ""));
+        // notify parent that the sub template was deleted but only once
+        myInternalReplaceHandlers.forEach(h -> h.replace(0, myLength, ""));
+
         isPushInvalidations = false; // avoid pushing every intermediary state as a value
         myCurCtxSubscription.unsubscribe();
     }
@@ -127,7 +131,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
     // test only
     long totalSubscriptions() {
-        return mySequences.stream().flatMap(List::stream).count();
+        return mySequences.stream().mapToLong(List::size).sum();
     }
 
 
@@ -138,10 +142,10 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
             // the ordering of the unfailing() calls affects output line numbers and stuff
 
-            if (!prevSlice.isEmpty()) {
+            if (!prevSlice.isEmpty() && !value.isEmpty()) {
                 LinkedList<Patch> patches = dmp.patchMake(prevSlice, value);
                 return (base, canFail) -> dmp.patchApply(patches, prevSlice, base.withOffset(start).unfailing(canFail));
-            } // else return the normal callback
+            } // else return the normal callback, bc the replace is trivial
         }
 
         return (base, canFail) -> base.unfailing(canFail).replace(start, end, value);
@@ -158,12 +162,11 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
         replacementStrategy.apply(myStringBuffer::replace, false);
 
-        // propagate the change to the templates that contain this one
-        myInternalReplaceHandlers.forEach(h -> replacementStrategy.apply(h, false));
-
         valIdx.propagateOffsetShift(value.length() - (end - start));
 
         if (isPushInvalidations) {
+            // propagate the change to the templates that contain this one
+            myInternalReplaceHandlers.forEach(h -> replacementStrategy.apply(h, false));
             myInvalidations.push(null);
             myUserHandler.forEach(h -> replacementStrategy.apply(h, true));
         }

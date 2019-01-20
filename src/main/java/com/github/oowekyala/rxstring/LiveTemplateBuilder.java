@@ -45,7 +45,6 @@ import javafx.util.Callback;
  * </ul>
  * </li>
  * </ul>
- * <ul>
  *
  * Builders own a small set of configuration properties that are ignored by the templates they build,
  * but allow using shorthands during the construction process. These are
@@ -240,6 +239,7 @@ public interface LiveTemplateBuilder<D> {
      * If the object is null, value has a null value, the empty string will be used.
      *
      * @param extractor Extracts the observable value to render from the data context
+     * @param <T>       Type of values to render
      *
      * @return This builder
      *
@@ -257,6 +257,7 @@ public interface LiveTemplateBuilder<D> {
      *
      * @param extractor Extracts the observable value to render from the data context
      * @param renderer  An object specifying how the value should be converted to a string
+     * @param <T>       Type of values to render
      *
      * @return This builder
      *
@@ -276,6 +277,7 @@ public interface LiveTemplateBuilder<D> {
      *
      * @param extractor Extracts the observable value to render from the data context
      * @param renderer  An object specifying how the value should be converted to a string
+     * @param <T>       Type of values to render
      *
      * @return This builder
      *
