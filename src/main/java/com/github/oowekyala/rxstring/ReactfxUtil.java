@@ -16,6 +16,7 @@ import javafx.collections.ObservableList;
 
 
 /**
+ *
  * @author Clément Fournier
  * @since 1.0
  */
@@ -58,11 +59,6 @@ final class ReactfxUtil {
                 return source.size();
             }
         };
-    }
-
-
-    static <T, R> Function<? super T, ? extends R> fun(Function<? super T, ? extends R> f) {
-        return f;
     }
 
 

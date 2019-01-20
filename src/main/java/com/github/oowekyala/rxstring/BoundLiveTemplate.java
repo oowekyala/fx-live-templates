@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.Objects;
 
 import org.reactfx.EventSource;
-import org.reactfx.EventStream;
 import org.reactfx.Subscription;
 import org.reactfx.value.Val;
 import org.reactfx.value.ValBase;
@@ -54,18 +53,18 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     private final Subscription myCurCtxSubscription;
     private final StringBuffer myStringBuffer;
     private final EventSource<?> myInvalidations = new EventSource<>();
-    private final EventSource<RxTextChange> myChangeSource = new EventSource<>();
+    private final List<ReplaceHandler> myUserHandler;
     private final List<ReplaceHandler> myInternalReplaceHandlers;
+    private boolean isPushInvalidations;
+
     /** The template that spawned this bound template. */
     private final LiveTemplate<D> myParent;
-    private boolean isPushInvalidations;
 
 
     BoundLiveTemplate(D dataContext,
                       LiveTemplate<D> parent,
                       List<BindingExtractor<D>> bindings,
                       List<ReplaceHandler> userReplaceHandler,
-                      EventSource<RxTextChange> exceptionalChangesSource,
                       List<ReplaceHandler> internalReplaceHandlers) {
 
         Objects.requireNonNull(dataContext);
@@ -78,6 +77,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
         this.myStringBuffer = new StringBuffer();
         this.myInternalReplaceHandlers = internalReplaceHandlers;
+        this.myUserHandler = userReplaceHandler;
 
         Subscription subscription = () -> {};
 
@@ -90,7 +90,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         this.isPushInvalidations = true;
         this.myCurCtxSubscription = subscription;
 
-        pushTextChange(exceptionalChangesSource).unfailing().replace(0, 0, myStringBuffer.toString());
+        myUserHandler.stream().map(ReplaceHandler::unfailing).forEach(h -> h.replace(0, 0, myStringBuffer.toString()));
     }
 
 
@@ -99,13 +99,14 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         return "BoundLiveTemplate{" +
             "myStringBuffer=" + myStringBuffer +
             ", myOuterOffsets=" + Arrays.toString(myOuterOffsets) +
+            ", myUserHandlers=" + myUserHandler +
             ", myInternalReplaceHandlers=" + myInternalReplaceHandlers +
             '}';
     }
 
 
-    void unbind(EventSource<RxTextChange> exceptionalChangesSource) {
-        pushTextChange(exceptionalChangesSource).unfailing().replace(0, myStringBuffer.length(), "");
+    void unbind() {
+        myUserHandler.stream().map(ReplaceHandler::unfailing).forEach(h -> h.replace(0, myStringBuffer.length(), ""));
         isPushInvalidations = false; // avoid pushing every intermediary state as a value
         myCurCtxSubscription.unsubscribe();
     }
@@ -121,11 +122,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     protected String computeValue() {
         return myStringBuffer.toString();
     }
-
-
-    EventStream<RxTextChange> textChanges() {
-        return myChangeSource;
-    }
+    // for construction
 
 
     // test only
@@ -168,13 +165,8 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
         if (isPushInvalidations) {
             myInvalidations.push(null);
-            replacementStrategy.apply(pushTextChange(myChangeSource), true);
+            myUserHandler.forEach(h -> replacementStrategy.apply(h, true));
         }
-    }
-
-
-    private ReplaceHandler pushTextChange(EventSource<RxTextChange> source) {
-        return (start, end, value) -> source.push(new RxTextChange(start, end, value));
     }
 
 
