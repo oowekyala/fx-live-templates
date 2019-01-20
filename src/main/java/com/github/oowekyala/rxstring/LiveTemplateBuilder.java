@@ -19,6 +19,7 @@ import javafx.util.Callback;
 /**
  * Builds a {@link LiveTemplate} with a fluent API.
  *
+ *
  * <p>A template can have the following structural elements:
  * <ul>
  * <li>String constants: those are independent of the data context. See
@@ -26,7 +27,7 @@ import javafx.util.Callback;
  * <li>{@link #render(Function, ItemRenderer) Constant bindings}: those will be
  * extracted from the data context at the time the template is bound, but are not
  * observable values themselves, so will only be rendered once.</li>
- * <li>Observable bindings: those will be extracted from the data context
+ * <li>Observable bindings: those are observable properties extracted from the data context
  * at the time the template is bound. Each time a property of the data context
  * changes value, the template updates its string value and calls its {@linkplain LiveTemplate#addReplaceHandler(ReplaceHandler) replace handlers}.
  * At the time of construction though, those are specified by an extraction

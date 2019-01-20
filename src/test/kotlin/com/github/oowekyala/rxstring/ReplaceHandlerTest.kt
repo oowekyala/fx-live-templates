@@ -133,7 +133,7 @@ class ReplaceHandlerTest : FunSpec({
         events should haveSize(0)
 
         lt.addReplaceHandler(mirrorChanges(extSb))
-        lt.addReplaceHandler(accumulateEvents(events))
+        lt.addReplaceHandler(recordEvents(events))
 
         extSb.toString() shouldBe "Foo[MissingOverride]bar"
         events should haveSize(1)
@@ -165,7 +165,7 @@ class ReplaceHandlerTest : FunSpec({
         extSb.toString() shouldBe ""
 
         lt.addReplaceHandler(mirrorChanges(extSb))
-        lt.addReplaceHandler(accumulateEvents(events))
+        lt.addReplaceHandler(recordEvents(events))
 
         events should haveSize(0)
         extSb.toString() shouldBe ""

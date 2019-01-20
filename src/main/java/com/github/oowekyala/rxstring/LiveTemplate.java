@@ -56,6 +56,7 @@ public interface LiveTemplate<D> extends Val<String> {
      *
      * @see #dataContextProperty()
      */
+    // TODO infer minimal replacement when switching data contexts
     default void setDataContext(D context) {
         dataContextProperty().setValue(context);
     }

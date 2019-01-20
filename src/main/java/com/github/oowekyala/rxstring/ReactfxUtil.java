@@ -16,7 +16,6 @@ import javafx.collections.ObservableList;
 
 
 /**
- *
  * @author Clément Fournier
  * @since 1.0
  */
@@ -31,15 +30,23 @@ final class ReactfxUtil {
         return val instanceof RigidObservable;
     }
 
-
+    // this breaks laziness
     public static <T, R> Val<R> mapPreserveConst(Val<? extends T> val, Function<? super T, ? extends R> f) {
         return isConst(val) ? Val.constant(f.apply(val.getValue())) : val.map(f);
     }
 
 
-    public static <E, F> List<F> lazyMappedView(
-        List<? extends E> source,
-        Function<? super E, ? extends F> f) {
+    /**
+     * A mapped view that remembers already computed elements. This is only safe
+     * is the backing list itself is completely immutable, i.e. it won't change
+     * and its elements also won't change.
+     *
+     * @param source Source collection
+     * @param f      Mapper
+     * @param <E>    Source elt type
+     * @param <F>    Target elt type
+     */
+    public static <E, F> List<F> lazyMappedView(List<? extends E> source, Function<? super E, ? extends F> f) {
         return new AbstractList<F>() {
 
             private List<F> cache = new ArrayList<>(Collections.nCopies(source.size(), null));

@@ -85,6 +85,11 @@ public class ItemRenderer<T> implements Function<T, Val<String>> {
     }
 
 
+    public static <T> ItemRenderer<T> surrounded(ItemRenderer<T> renderer, String prefix, String suffix) {
+        return templated(null, b -> b.append(prefix).render(Function.identity(), renderer).append(suffix));
+    }
+
+
     /**
      * A value renderer that maps Ts to an observable string using the provided asString.
      * This is the most general way to create a value renderer.
@@ -117,16 +122,12 @@ public class ItemRenderer<T> implements Function<T, Val<String>> {
             : ((LiveTemplateBuilderImpl) parent).spawnChildWithSameConfig();
 
         subTemplateBuilder.accept(childBuilder);
-        // create a single builder that will spawn several templates
-        // only build the template once
-
         // only build the template once
         LiveTemplate<T> subTemplate = childBuilder.toTemplate();
 
-        // ensure the template itself is never escaped in full, even after a lift call
-
         return new ItemRenderer<T>(true, childBuilder::toBoundTemplate) {
 
+            // ensure the template itself is never escaped in full, even after a lift call
             @Override
             public ItemRenderer<ObservableValue<T>> lift() {
                 return new ItemRenderer<>(true, tObs -> {

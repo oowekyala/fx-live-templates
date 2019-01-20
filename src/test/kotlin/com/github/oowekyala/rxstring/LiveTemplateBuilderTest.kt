@@ -321,4 +321,39 @@ class LiveTemplateBuilderTest : FunSpec({
 
     }
 
+
+
+
+    test("Test surrounded renderer bind") {
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+        }
+
+        val events = mutableListOf<ReplaceEvent>()
+
+        val lt =
+                LiveTemplate.newBuilder<DContext>()
+                        .append("<top ").bind({ it.name }, ItemRenderer.surrounded(ItemRenderer.asString(), "name='", "'")).append("/>")
+                        .toBoundTemplate(DContext(), recordEvents(events))
+
+
+
+        lt.value shouldBe """
+            <top name='top'/>
+        """.trimIndent()
+
+        lt.dataContext.name.value = "foo"
+
+        lt.value shouldBe """
+            <top name='foo'/>
+        """.trimIndent()
+
+        lt.dataContext.name.value = null
+
+        lt.value shouldBe """
+            <top />
+        """.trimIndent()
+    }
+
 })
