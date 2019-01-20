@@ -52,9 +52,10 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
 
 
     Subscription addInternalReplaceHandler(ReplaceHandler handler) {
+        myInternalReplaceHandlers.clear();
         myInternalReplaceHandlers.add(handler);
         return Subscription.EMPTY;
-        //        return () -> myInternalReplaceHandlers.remove(handler);
+//                return () -> myInternalReplaceHandlers.remove(handler);
     }
 
 

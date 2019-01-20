@@ -2,17 +2,21 @@ package com.github.oowekyala.rxstring;
 
 import java.util.AbstractList;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import org.reactfx.EventStreams;
 import org.reactfx.RigidObservable;
 import org.reactfx.Subscription;
+import org.reactfx.collection.LiveListBase;
+import org.reactfx.collection.UnmodifiableByDefaultLiveList;
 import org.reactfx.util.TriFunction;
 import org.reactfx.value.Val;
 
+import javafx.beans.value.ObservableValue;
 import javafx.collections.ObservableList;
 
 
@@ -27,7 +31,7 @@ final class ReactfxUtil {
     }
 
 
-    public static boolean isConst(Val<?> val) {
+    public static boolean isConst(ObservableValue<?> val) {
         return val instanceof RigidObservable;
     }
 
@@ -39,9 +43,8 @@ final class ReactfxUtil {
 
 
     /**
-     * A mapped view that remembers already computed elements. This is only safe
-     * is the backing list itself is completely immutable, i.e. it won't change
-     * and its elements also won't change.
+     * A mapped view that remembers already computed elements. The function
+     * should be pure.
      *
      * @param source Source collection
      * @param f      Mapper
@@ -51,15 +54,12 @@ final class ReactfxUtil {
     public static <E, F> List<F> lazyMappedView(List<? extends E> source, Function<? super E, ? extends F> f) {
         return new AbstractList<F>() {
 
-            private List<F> cache = new ArrayList<>(Collections.nCopies(source.size(), null));
+            private Map<E, F> cache = new WeakHashMap<>();
 
 
             @Override
             public F get(int index) {
-                if (cache.get(index) == null) {
-                    cache.set(index, f.apply(source.get(index)));
-                }
-                return cache.get(index);
+                return cache.computeIfAbsent(source.get(index), f);
             }
 
 

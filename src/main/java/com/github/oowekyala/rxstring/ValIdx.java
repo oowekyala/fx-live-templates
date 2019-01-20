@@ -108,9 +108,10 @@ final class ValIdx implements Comparable<ValIdx> {
             propagateItemShift(-1);
             parent.remove(innerIdx);
         }
+        shouldDelete = true;
     }
 
-
+    // FIXME remove
     void signalDontDelete() {
         this.shouldDelete = false;
     }

@@ -199,8 +199,7 @@ public interface LiveTemplateBuilder<D> {
      * @see #bind(Function, ItemRenderer)
      */
     default <T> LiveTemplateBuilder<D> render(Function<? super D, ? extends T> extractor, ItemRenderer<T> renderer) {
-        // note: don't use the bindSeq with ValueRenderer here as it escapes the content
-        return bindSeq(extractor.andThen(Val::constant).andThen(LiveList::wrapVal)::apply, renderer);
+        return bind(extractor.andThen(Val::constant), renderer);
     }
 
 
@@ -265,8 +264,8 @@ public interface LiveTemplateBuilder<D> {
      * @see #bindSeq(Function, SeqRenderer)
      * @see #render(Function, ItemRenderer)
      */
-    default <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<T>> extractor, ItemRenderer<T> renderer) {
-        return render(extractor, renderer.lift());
+    default <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<? extends T>> extractor, ItemRenderer<? super T> renderer) {
+        return bindSeq(extractor.andThen(LiveList::wrapVal)::apply, renderer);
     }
 
 
@@ -285,7 +284,7 @@ public interface LiveTemplateBuilder<D> {
      * @see #bindSeq(Function, SeqRenderer)
      * @see #render(Function, ItemRenderer)
      */
-    default <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<T>> extractor, Function<T, String> renderer) {
+    default <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<? extends T>> extractor, Function<? super T, String> renderer) {
         return bind(extractor, ItemRenderer.asString(renderer));
     }
 
@@ -310,7 +309,7 @@ public interface LiveTemplateBuilder<D> {
      * @see #bindTemplatedSeq(Function, Consumer)
      * @see #bind(Function, ItemRenderer)
      */
-    default <T> LiveTemplateBuilder<D> bindTemplate(Function<? super D, ? extends ObservableValue<T>> extractor,
+    default <T> LiveTemplateBuilder<D> bindTemplate(Function<? super D, ? extends ObservableValue<? extends T>> extractor,
                                                     Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
         return bind(extractor, ItemRenderer.templated(this, subTemplateBuilder));
     }
@@ -365,8 +364,7 @@ public interface LiveTemplateBuilder<D> {
      */
     default <T> LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<? extends T>> extractor,
                                                ItemRenderer<? super T> renderer) {
-        return bindSeq(extractor.andThen(l -> LiveList.map(l, Function.identity())),
-                       SeqRenderer.forItems(renderer.escapeWith(getDefaultEscapeFunction())));
+        return bindSeq(extractor, SeqRenderer.forItems(renderer.escapeWith(getDefaultEscapeFunction())));
     }
 
 

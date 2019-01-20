@@ -86,7 +86,7 @@ final class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
 
     @Override
     public <T> LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<? extends T>> extractor, SeqRenderer<? super T> renderer) {
-        myBindings.add(extractor.andThen(renderer)::apply);
+        myBindings.add(extractor.andThen(lst -> renderer.apply(this, lst))::apply);
         return this;
     }
 

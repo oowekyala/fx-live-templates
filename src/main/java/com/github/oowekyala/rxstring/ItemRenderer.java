@@ -1,5 +1,6 @@
 package com.github.oowekyala.rxstring;
 
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -16,26 +17,10 @@ import javafx.beans.value.ObservableValue;
  *
  * @param <T> Type of values to map
  */
-public class ItemRenderer<T> implements Function<T, Val<String>> {
-
-    private final Function<? super T, ? extends Val<String>> myFun;
-    private final boolean myNoEscape;
+public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<?>, ObservableValue<? extends T>, Val<String>> {
 
 
-    ItemRenderer(boolean ignoreEscape, Function<? super T, ? extends Val<String>> fun) {
-        myFun = fun;
-        this.myNoEscape = ignoreEscape;
-    }
-
-
-    /**
-     * Returns a renderer that can render ObservableValues of T.
-     */
-    ItemRenderer<ObservableValue<T>> lift() {
-        // The default implementation is to use {@link Val#flatMap(Function)},
-        // but the templated renderer has to preserve the fact that the end Val<String>
-        // is in fact a sub template
-        return new ItemRenderer<>(myNoEscape, tObs -> Val.flatMap(tObs, this));
+    private ItemRenderer() {
     }
 
 
@@ -48,21 +33,7 @@ public class ItemRenderer<T> implements Function<T, Val<String>> {
      *
      * @return A new renderer
      */
-    public ItemRenderer<T> escapeWith(Function<String, String> escapeFun) {
-        return myNoEscape ? this : new ItemRenderer<>(/* ignoreEscape */true, myFun.andThen(v -> ReactfxUtil.mapPreserveConst(v, escapeFun)));
-    }
-
-
-    @Override
-    public Val<String> apply(T t) {
-        return myFun.apply(t);
-    }
-
-
-    @Override
-    public <V> ItemRenderer<V> compose(Function<? super V, ? extends T> before) {
-        return new ItemRenderer<>(myNoEscape, myFun.compose(before));
-    }
+    public abstract ItemRenderer<T> escapeWith(Function<String, String> escapeFun);
 
 
     /**
@@ -84,7 +55,7 @@ public class ItemRenderer<T> implements Function<T, Val<String>> {
      * @param <T> Type of values this renderer can handle
      */
     public static <T> ItemRenderer<T> asString(Function<? super T, String> f) {
-        return new ItemRenderer<>(false, f.andThen(Val::constant));
+        return new MappedItemRenderer<>(false, f.andThen(Val::constant));
     }
 
 
@@ -100,7 +71,7 @@ public class ItemRenderer<T> implements Function<T, Val<String>> {
      * @return A new renderer
      */
     public static <T> ItemRenderer<T> surrounded(ItemRenderer<T> renderer, String prefix, String suffix) {
-        return templated(null, b -> b.append(prefix).render(Function.identity(), renderer).append(suffix));
+        return ItemRenderer.<T>templated(null, b -> b.append(prefix).<T>render(t -> t, renderer).append(suffix));
     }
 
 
@@ -113,7 +84,7 @@ public class ItemRenderer<T> implements Function<T, Val<String>> {
      * @param <T>          Type of values this renderer can handle
      */
     public static <T> ItemRenderer<T> mappingObservable(Function<? super T, ? extends ObservableValue<String>> fun, boolean ignoreEscape) {
-        return new ItemRenderer<>(ignoreEscape, fun.andThen(Val::wrap));
+        return new MappedItemRenderer<T>(ignoreEscape, fun.andThen(Val::wrap));
     }
 
 
@@ -130,28 +101,80 @@ public class ItemRenderer<T> implements Function<T, Val<String>> {
      * @return A value renderer for Ts
      */
     static <T> ItemRenderer<T> templated(LiveTemplateBuilder<?> parent, Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
-        LiveTemplateBuilder<T> childBuilder =
-            parent == null
-            ? LiveTemplate.newBuilder()
-            : ((LiveTemplateBuilderImpl) parent).spawnChildWithSameConfig();
+        return new TemplatedItemRenderer<T>(parent, subTemplateBuilder);
+    }
 
-        subTemplateBuilder.accept(childBuilder);
-        // only build the template once
-        LiveTemplate<T> subTemplate = childBuilder.toTemplate();
 
-        return new ItemRenderer<T>(true, childBuilder::toBoundTemplate) {
+    private static class MappedItemRenderer<T> extends ItemRenderer<T> {
+        private final BiFunction<? super LiveTemplateBuilder<?>, ? super T, ? extends Val<String>> myFun;
 
-            // ensure the template itself is never escaped in full, even after a lift call
-            @Override
-            public ItemRenderer<ObservableValue<T>> lift() {
-                return new ItemRenderer<>(true, tObs -> {
-                    // Cannot use flatmap here, the Val<String> must be a subtemplate
-                    // and not a FlatMappedVal
-                    subTemplate.dataContextProperty().unbind();
-                    subTemplate.dataContextProperty().bind(tObs);
-                    return subTemplate;
-                });
+        private final boolean myNoEscape;
+
+
+        /** Most general constructor. */
+        private MappedItemRenderer(boolean ignoreEscape,
+                                   BiFunction<? super LiveTemplateBuilder<?>, ? super T, ? extends Val<String>> myFun) {
+            this.myNoEscape = ignoreEscape;
+            this.myFun = myFun;
+        }
+
+
+        /** Constructor for a renderer that doesn't use the builder config. */
+        private MappedItemRenderer(boolean ignoreEscape, Function<? super T, ? extends Val<String>> myFun) {
+            this(ignoreEscape, (ctx, t) -> myFun.apply(t));
+        }
+
+
+        @Override
+        public Val<String> apply(LiveTemplateBuilder<?> liveTemplateBuilder, ObservableValue<? extends T> tObs) {
+            return Val.flatMap(tObs, t -> myFun.apply(liveTemplateBuilder, t));
+        }
+
+
+        public ItemRenderer<T> escapeWith(Function<String, String> escapeFun) {
+            return myNoEscape ? this : new MappedItemRenderer<>(true, myFun.andThen(v -> ReactfxUtil.mapPreserveConst(v, escapeFun)));
+        }
+
+    }
+
+
+    private static class TemplatedItemRenderer<T> extends ItemRenderer<T> {
+
+        private final Consumer<LiveTemplateBuilder<T>> subTemplateBuilder;
+        private LiveTemplate<T> subTemplate;
+
+
+        TemplatedItemRenderer(LiveTemplateBuilder<?> parent, Consumer<LiveTemplateBuilder<T>> subtemplateBuilder) {
+            this.subTemplateBuilder = subtemplateBuilder;
+
+        }
+
+
+        @Override
+        public ItemRenderer<T> escapeWith(Function<String, String> escapeFun) {
+            return this;
+        }
+
+
+        @Override
+        public Val<String> apply(LiveTemplateBuilder<?> parent, ObservableValue<? extends T> tObs) {
+            if (subTemplate == null) {
+                LiveTemplateBuilder<T> childBuilder = parent instanceof LiveTemplateBuilderImpl
+                                                      ? ((LiveTemplateBuilderImpl) parent).spawnChildWithSameConfig()
+                                                      : LiveTemplate.newBuilder();
+
+                subTemplateBuilder.accept(childBuilder);
+                // only build the template once
+                subTemplate = childBuilder.toBoundTemplate(tObs.getValue());
             }
-        };
+            if (!ReactfxUtil.isConst(tObs)) {
+                subTemplate.dataContextProperty().unbind();
+                subTemplate.dataContextProperty().bind(tObs);
+
+            } else {
+                subTemplate.setDataContext(tObs.getValue());
+            }
+            return subTemplate;
+        }
     }
 }
