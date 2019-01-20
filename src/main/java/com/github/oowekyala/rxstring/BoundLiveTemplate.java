@@ -55,7 +55,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     private final EventSource<?> myInvalidations = new EventSource<>();
     private final List<ReplaceHandler> myUserHandler;
     private final List<ReplaceHandler> myInternalReplaceHandlers;
-    private final boolean isInitialized;
+    private boolean isPushInvalidations;
 
     /** The template that spawned this bound template. */
     private final LiveTemplate<D> myParent;
@@ -87,7 +87,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
             );
         }
 
-        this.isInitialized = true;
+        this.isPushInvalidations = true;
         this.myCurCtxSubscription = subscription;
 
         myUserHandler.stream().map(ReplaceHandler::unfailing).forEach(h -> h.replace(0, 0, myStringBuffer.toString()));
@@ -106,6 +106,8 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
 
     void unbind() {
+        myUserHandler.stream().map(ReplaceHandler::unfailing).forEach(h -> h.replace(0, myStringBuffer.length(), ""));
+        isPushInvalidations = false; // avoid pushing every intermediary state as a value
         myCurCtxSubscription.unsubscribe();
     }
 
@@ -161,7 +163,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
         valIdx.propagateOffsetShift(value.length() - (end - start));
 
-        if (isInitialized) {
+        if (isPushInvalidations) {
             myInvalidations.push(null);
             myUserHandler.forEach(h -> replacementStrategy.apply(h, true));
         }
@@ -216,7 +218,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
 
     private ValIdx insertBindingAt(int outerIdx, int innerIdx) {
-        return new ValIdx(myOuterOffsets, myStringBuffer, outerIdx, innerIdx, mySequences.get(outerIdx), !isInitialized);
+        return new ValIdx(myOuterOffsets, myStringBuffer, outerIdx, innerIdx, mySequences.get(outerIdx));
     }
 
 

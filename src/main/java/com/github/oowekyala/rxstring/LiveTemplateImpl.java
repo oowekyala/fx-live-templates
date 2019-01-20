@@ -36,11 +36,12 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
 
             if (!myCurBound.isEmpty()) {
                 myCurBound.getValue().unbind();
-                myCurBound.setValue(null);
             }
 
             if (newCtx != null) {
                 myCurBound.setValue(new BoundLiveTemplate<>(newCtx, this, dataBinder, myUserReplaceHandlers, myInternalReplaceHandlers));
+            } else {
+                myCurBound.setValue(null);
             }
         });
 

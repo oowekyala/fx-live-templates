@@ -28,8 +28,7 @@ final class ValIdx implements Comparable<ValIdx> {
            StringBuffer stringBuffer,
            int outerIdx,
            int innerIdx,
-           List<ValIdx> parent,
-           boolean isInitializing) {
+           List<ValIdx> parent) {
 
         this.stringBuffer = stringBuffer;
         this.outerIdx = outerIdx;
@@ -41,12 +40,11 @@ final class ValIdx implements Comparable<ValIdx> {
 
         // you can't call left().length() after setting this node in its parent
         parent.add(innerIdx, this);
-        if (!isInitializing) {
-            propagateItemShift(+1);
-            // The offset shift will be propagated via handleContentChange
-            // when inserting the initial value, so not here
-            // propagateOffsetShift(initialLength);
-        }
+        propagateItemShift(+1);
+        // The offset shift will be propagated via handleContentChange
+        // when inserting the initial value, so not here
+        // propagateOffsetShift(initialLength);
+
     }
 
 

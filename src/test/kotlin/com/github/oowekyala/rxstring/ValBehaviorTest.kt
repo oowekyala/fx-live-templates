@@ -453,4 +453,79 @@ class ValBehaviorTest : FunSpec({
         vals shouldBe listOf(17, 14, 20)
 
     }
+
+
+    test("Test value stream") {
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+        }
+
+        val lt = LiveTemplate
+                .builder<DContext>()
+                .append("[").bind { it.name }.append("]")
+                .toTemplate()
+
+        val vals = mutableListOf<String>()
+        lt.values().subscribe { vals += it }
+
+        val dc = DContext()
+        lt.dataContext = dc
+
+        dc.name.value = null
+        dc.name.value = "gaspar"
+
+        lt.dataContext = null
+
+        vals shouldBe listOf(null, "[top]", "[]", "[gaspar]", null)
+    }
+
+    test("Test hot data context swap") {
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+        }
+
+        val lt = LiveTemplate
+                .builder<DContext>()
+                .append("[").bind { it.name }.append("]")
+                .toTemplate()
+
+        val vals = mutableListOf<String>()
+        lt.values().subscribe { vals += it }
+
+        val dc = DContext()
+        lt.dataContext = dc
+
+        dc.name.value = null
+        dc.name.value = "gaspar"
+
+        lt.dataContext = DContext()
+
+
+
+        vals shouldBe listOf(null, "[top]", "[]", "[gaspar]", "[top]")
+    }
+
+    test("Test null to null data context swap") {
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+        }
+
+        val lt = LiveTemplate
+                .builder<DContext>()
+                .append("[").bind { it.name }.append("]")
+                .toTemplate()
+
+        val vals = mutableListOf<String>()
+        lt.values().subscribe { vals += it }
+
+
+        lt.dataContext shouldBe null
+        lt.dataContext = null
+        lt.dataContext = null
+
+        vals shouldBe listOf(null) // just one value
+    }
 })

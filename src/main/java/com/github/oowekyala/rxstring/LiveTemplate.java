@@ -21,7 +21,7 @@ import org.reactfx.value.Var;
 public interface LiveTemplate<D> extends Val<String> {
 
     /**
-     * Logger used by all live templates.
+     * Logger used by live templates to report eg failure of an external handler.
      */
     Logger LOGGER = Logger.getLogger(LiveTemplate.class.getName());
 
@@ -32,15 +32,26 @@ public interface LiveTemplate<D> extends Val<String> {
      * is null, i.e. {@link #isEmpty()} returns true.
      *
      * @return The data context property
+     *
+     * @see #setDataContext(Object)
      */
     Var<D> dataContextProperty();
 
 
     /**
-     * Rebinds this template to the given data context. If null, then
-     * just unbinds the current data context, if any, and sets this
-     * value to empty. The {@linkplain #addReplaceHandler(ReplaceHandler) replacement handlers}
-     * are also called when unbinding to perform deletions.
+     * Rebinds this template to the given data context. If null, then just unbinds the current
+     * data context, if any, and sets this value to empty. The {@linkplain #addReplaceHandler(ReplaceHandler)
+     * replacement handlers} are also called when unbinding to perform deletions.
+     *
+     * <p>When setting the data context to a non-null value, the {@linkplain #getValue() value}
+     * of this Val passes from its previous state to the full text bound to the new data context.
+     * When setting the data context to a null value, the value goes directly to null. If the value
+     * was already null, no changed is recorder. This is illustrated by the following schema:
+     * <pre>
+     * data context:  ---null  d1--------------...--d1  d2--------d2   null  null
+     * value:         ---null  text(d1)--------...--|   text(d2)--|    null------
+     * time:         >---|-----|---------------...--|---|---------|----|--------->
+     * </pre>
      *
      * @param context The new data context
      *
@@ -72,11 +83,14 @@ public interface LiveTemplate<D> extends Val<String> {
      *
      * Handlers are called once with the whole evaluated value of this
      * template when switching data contexts (parameters (0,0,text)).
-     * After that they're only called incrementally.
+     * After that they're only called incrementally. When unbinding the
+     * data context, handlers are called once to delete the whole text
+     * (parameters (0, text.length, "")).
      *
      * Exceptions in handlers are logged with {@link #LOGGER} but are
      * not rethrown.
      *
+     * TODO fix that by exposing text changes
      * FIXME: handlers must be added BEFORE calling {@link #setDataContext(Object)},
      * otherwise the initial replacement is lost.
      *
