@@ -24,7 +24,7 @@ class LiveTemplateBuilderTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>().withDefaultIndent("* ")
+                .newBuilder<DContext>().withDefaultIndent("* ")
                 .appendIndent(1).append("<top name='").bind { it.name }.appendLine("'>")
                 .bindTemplate({ it.sub }) { sub ->
                     sub.appendIndent(2).append("<sub name='").bind { it.name }.append("' num='").bind { it.num }.append("'/>")
@@ -62,7 +62,7 @@ class LiveTemplateBuilderTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>().withDefaultIndent("* ")
+                .newBuilder<DContext>().withDefaultIndent("* ")
                 .appendIndent(1).append("<top name='").bind { it.name }.appendLine("'>")
                 .bindTemplatedSeq({ it.sub }) { sub ->
                     sub.appendIndent(2).append("<sub name='").bind { it.name }.append("' num='").bind { it.num }.appendLine("'/>")
@@ -108,7 +108,7 @@ class LiveTemplateBuilderTest : FunSpec({
         }
 
         val lt =
-                LiveTemplate.builder<DContext>()
+                LiveTemplate.newBuilder<DContext>()
                         .withDefaultEscape { s -> "@$s@" }
                         .append("<top name='").bind { it.name }.appendLine("'>")
                         .bindTemplatedSeq({ it.sub }) { sub ->
@@ -148,7 +148,7 @@ class LiveTemplateBuilderTest : FunSpec({
         }
 
         val lt =
-                LiveTemplate.builder<DContext>()
+                LiveTemplate.newBuilder<DContext>()
                         .withDefaultEscape { "@$it@" }
                         .append("<top name='").bind { it.name }.appendLine("'>")
                         .bindTemplate({ it.sub }) { sub ->
@@ -181,7 +181,7 @@ class LiveTemplateBuilderTest : FunSpec({
         }
 
         val lt =
-                LiveTemplate.builder<DContext>()
+                LiveTemplate.newBuilder<DContext>()
                         .append("<top name='").bind({ it.name }) { "@$it" }.append("'/>")
                         .toBoundTemplate(DContext())
 
@@ -204,7 +204,7 @@ class LiveTemplateBuilderTest : FunSpec({
         }
 
         val lt =
-                LiveTemplate.builder<DContext>()
+                LiveTemplate.newBuilder<DContext>()
                         .append("<top nums='").bindSeq({ it.nums }) { Integer.toHexString(it) + "," }.append("'/>")
                         .toBoundTemplate(DContext())
 
@@ -227,7 +227,7 @@ class LiveTemplateBuilderTest : FunSpec({
         }
 
         val lt =
-                LiveTemplate.builder<DContext>()
+                LiveTemplate.newBuilder<DContext>()
                         .append("<top nums='").bindSeq({ it.nums }, SeqRenderer.delimited(ItemRenderer.asString(), "[", "]", ",")).append("'/>")
                         .toBoundTemplate(DContext())
 
@@ -298,7 +298,7 @@ class LiveTemplateBuilderTest : FunSpec({
         }
 
         val lt =
-                LiveTemplate.builder<DContext>()
+                LiveTemplate.newBuilder<DContext>()
                         .append("<top nums='").bindSeq({ it.nums }, SeqRenderer.delimited(ItemRenderer.asString(), "", "", ",")).append("'/>")
                         .toBoundTemplate(DContext())
 
@@ -313,7 +313,7 @@ class LiveTemplateBuilderTest : FunSpec({
         }
 
         val lt =
-                LiveTemplate.builder<DContext>()
+                LiveTemplate.newBuilder<DContext>()
                         .append("<top nums='").bindSeq({ it.nums }) { null }.append("'/>")
                         .toBoundTemplate(DContext())
 

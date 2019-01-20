@@ -19,7 +19,7 @@ class ValBehaviorTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("Foo[")
                 .bind { it.name }
                 .append("]bar")
@@ -50,7 +50,7 @@ class ValBehaviorTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("Foo[")
                 .bind { it.name }
                 .append("]bar<")
@@ -81,7 +81,7 @@ class ValBehaviorTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("Foo[")
                 .bind { it.name }
                 .append("]bar")
@@ -114,7 +114,7 @@ class ValBehaviorTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("<top name='").bind { it.name }.appendLine("'>")
                 .bindTemplate({ it.sub }) { sub ->
                     sub.append("<sub name='").bind { it.name }.append("' num='").bind { it.num }.append("'/>")
@@ -170,7 +170,7 @@ class ValBehaviorTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("<top name='").bind { it.name }.appendLine("'>")
                 .bindTemplate({ it.sub }) { sub ->
                     sub.append("<sub name='").bind { it.name }.append("' num='").bind { it.num }.append("'/>")
@@ -204,7 +204,7 @@ class ValBehaviorTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .appendLine("<top>")
                 .bindSeq { it.strings }
                 .endLine()
@@ -251,7 +251,7 @@ class ValBehaviorTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .appendLine("<top>")
                 .bindSeq { it.strings }
                 .endLine()
@@ -299,7 +299,7 @@ class ValBehaviorTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .appendLine("<top>")
                 .bindSeq { it.strings }
                 .endLine()
@@ -358,7 +358,7 @@ class ValBehaviorTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("Foo[")
                 .bind { it.name }
                 .append("]bar")
@@ -387,7 +387,7 @@ class ValBehaviorTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("<top name='").bind { it.name }.appendLine("'>")
                 .bindTemplate({ it.sub }) { sub ->
                     sub.append("<sub name='").bind { it.name }.append("' num='").bind { it.num }.append("'/>")
@@ -434,7 +434,7 @@ class ValBehaviorTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("<top name='").bind { it.name }.appendLine("'>")
                 .toTemplate()
 
@@ -462,7 +462,7 @@ class ValBehaviorTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("[").bind { it.name }.append("]")
                 .toTemplate()
 
@@ -487,7 +487,7 @@ class ValBehaviorTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("[").bind { it.name }.append("]")
                 .toTemplate()
 
@@ -514,7 +514,7 @@ class ValBehaviorTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("[").bind { it.name }.append("]")
                 .toTemplate()
 

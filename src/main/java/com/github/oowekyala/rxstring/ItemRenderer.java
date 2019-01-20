@@ -113,7 +113,7 @@ public class ItemRenderer<T> implements Function<T, Val<String>> {
     static <T> ItemRenderer<T> templated(LiveTemplateBuilder<?> parent, Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
         LiveTemplateBuilder<T> childBuilder =
             parent == null
-            ? LiveTemplate.builder()
+            ? LiveTemplate.newBuilder()
             : ((LiveTemplateBuilderImpl) parent).spawnChildWithSameConfig();
 
         subTemplateBuilder.accept(childBuilder);
@@ -138,16 +138,5 @@ public class ItemRenderer<T> implements Function<T, Val<String>> {
                 });
             }
         };
-    }
-
-
-    private static class DummyDataContext<T> {
-
-        public final T value;
-
-
-        private DummyDataContext(T value) {
-            this.value = value;
-        }
     }
 }

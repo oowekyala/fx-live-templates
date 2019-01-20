@@ -21,7 +21,7 @@ class ReplaceHandlerTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("Foo[")
                 .bind { it.name }
                 .append("]bar")
@@ -46,7 +46,7 @@ class ReplaceHandlerTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("Foo[")
                 .bind { it.name }
                 .append("]bar")
@@ -86,7 +86,7 @@ class ReplaceHandlerTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("Foo[")
                 .bind { it.name }
                 .append("]bar")
@@ -110,13 +110,74 @@ class ReplaceHandlerTest : FunSpec({
 
     }
 
+
+    test("Test adding a handler after binding should insert current text") {
+        class DContext {
+            val name = Var.newSimpleVar("MissingOverride")
+        }
+
+        val lt = LiveTemplate
+                .newBuilder<DContext>()
+                .append("Foo[")
+                .bind { it.name }
+                .append("]bar")
+                .toTemplate()
+
+        val extSb = StringBuilder()
+        val events = mutableListOf<ReplaceEvent>()
+
+        lt.value shouldBe null
+        lt.dataContext = DContext()
+        lt.value shouldBe "Foo[MissingOverride]bar"
+        extSb.toString() shouldBe ""
+        events should haveSize(0)
+
+        lt.addReplaceHandler(mirrorChanges(extSb))
+        lt.addReplaceHandler(accumulateEvents(events))
+
+        extSb.toString() shouldBe "Foo[MissingOverride]bar"
+        events should haveSize(1)
+        events.last() shouldBe ReplaceEvent(0, 0, "Foo[MissingOverride]bar")
+
+        lt.dataContext.name.value = "HELLO"
+
+        lt.value shouldBe "Foo[HELLO]bar"
+        extSb.toString() shouldBe "Foo[HELLO]bar"
+
+    }
+
+    test("Test adding a handler with no binding should not push an event") {
+        class DContext {
+            val name = Var.newSimpleVar("MissingOverride")
+        }
+
+        val lt = LiveTemplate
+                .newBuilder<DContext>()
+                .append("Foo[")
+                .bind { it.name }
+                .append("]bar")
+                .toTemplate()
+
+        val extSb = StringBuilder()
+        val events = mutableListOf<ReplaceEvent>()
+
+        lt.value shouldBe null
+        extSb.toString() shouldBe ""
+
+        lt.addReplaceHandler(mirrorChanges(extSb))
+        lt.addReplaceHandler(accumulateEvents(events))
+
+        events should haveSize(0)
+        extSb.toString() shouldBe ""
+    }
+
     test("A removed handler should not be executed") {
         class DContext {
             val name = Var.newSimpleVar("MissingOverride")
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("Foo[")
                 .bind { it.name }
                 .append("]bar")
@@ -150,7 +211,7 @@ class ReplaceHandlerTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("Foo[")
                 .bind { it.name }
                 .append("]bar")
@@ -189,7 +250,7 @@ class ReplaceHandlerTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("Foo[")
                 .bind { it.name }
                 .append("]bar")
@@ -231,7 +292,7 @@ class ReplaceHandlerTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("<top name='").bind { it.name }.appendLine("'>")
                 .bindTemplate({ it.sub }) { sub ->
                     sub.append("<sub name='").bind { it.name }.append("' num='").bind { it.num }.append("'/>")
@@ -295,7 +356,7 @@ class ReplaceHandlerTest : FunSpec({
         val events = mutableListOf<ReplaceEvent>()
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("<top name='").bind { it.name }.appendLine("'>")
                 .bindTemplatedSeq({ it.subs }) { sub ->
                     sub.append("<sub name='").bind { it.name }.append("' num='").bind { it.num }.appendLine("'/>")
@@ -358,7 +419,7 @@ class ReplaceHandlerTest : FunSpec({
         }
 
         val lt = LiveTemplate
-                .builder<DContext>()
+                .newBuilder<DContext>()
                 .append("<top name='").bind { it.name }.appendLine("'>")
                 .bindTemplatedSeq({ it.subs }) { sub ->
                     sub.append("<sub name='").bind { it.name }.append("' num='").bind { it.num }.appendLine("'/>")

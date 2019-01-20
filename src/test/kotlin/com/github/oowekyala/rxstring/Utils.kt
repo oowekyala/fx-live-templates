@@ -1,6 +1,7 @@
 package com.github.oowekyala.rxstring
 
 import io.kotlintest.specs.AbstractFunSpec
+import java.lang.StringBuilder
 import java.util.logging.Handler
 import java.util.logging.LogRecord
 import io.kotlintest.shouldBe as kotlintestShouldBe
@@ -46,3 +47,8 @@ class GroupTestCtx(private val funspec: AbstractFunSpec, private val groupName: 
         }
     }
 }
+
+internal fun accumulateEvents(events: MutableList<ReplaceEvent>): ReplaceHandler
+        = ReplaceHandler { s, e, v -> events += ReplaceEvent(s, e, v) }
+
+internal fun mirrorChanges(extSb: StringBuilder): ReplaceHandler = ReplaceHandler { start, end, value -> extSb.replace(start, end, value) }

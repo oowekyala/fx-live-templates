@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import org.reactfx.Subscription;
 import org.reactfx.value.Val;
 import org.reactfx.value.Var;
 
@@ -72,8 +73,10 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
 
 
     @Override
-    public void addReplaceHandler(ReplaceHandler handler) {
+    public Subscription addReplaceHandler(ReplaceHandler handler) {
+        myCurBound.getOpt().ifPresent(bound -> handler.replace(0, 0, bound.getValue()));
         myUserReplaceHandlers.add(Objects.requireNonNull(handler));
+        return () -> removeReplaceHandler(handler);
     }
 
 

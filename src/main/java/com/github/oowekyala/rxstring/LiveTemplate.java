@@ -2,13 +2,14 @@ package com.github.oowekyala.rxstring;
 
 import java.util.logging.Logger;
 
+import org.reactfx.Subscription;
 import org.reactfx.value.Val;
 import org.reactfx.value.Var;
 
 
 /**
  * A {@link Val}&lt;String&gt; that binds to the properties of an object and reacts their changes.
- * You can build one with a {@link LiveTemplateBuilder}, see {@link LiveTemplate#builder()}.
+ * You can build one with a {@link LiveTemplateBuilder}, see {@link LiveTemplate#newBuilder()}.
  *
  * TODO Streamline edition of optional attributes/elements
  * TODO make lazy
@@ -20,9 +21,7 @@ import org.reactfx.value.Var;
  */
 public interface LiveTemplate<D> extends Val<String> {
 
-    /**
-     * Logger used by live templates to report eg failure of an external handler.
-     */
+    /** Logger used by live templates to report eg failure of an external handler. */
     Logger LOGGER = Logger.getLogger(LiveTemplate.class.getName());
 
 
@@ -41,7 +40,7 @@ public interface LiveTemplate<D> extends Val<String> {
     /**
      * Rebinds this template to the given data context. If null, then just unbinds the current
      * data context, if any, and sets this value to empty. The {@linkplain #addReplaceHandler(ReplaceHandler)
-     * replacement handlers} are also called when unbinding to perform deletions.
+     * replacement handlers} are also called when binding and unbinding.
      *
      * <p>When setting the data context to a non-null value, the {@linkplain #getValue() value}
      * of this Val passes from its previous state to the full text bound to the new data context.
@@ -77,28 +76,42 @@ public interface LiveTemplate<D> extends Val<String> {
      * properties (or in data context) causes a change in the string
      * value of this template.
      *
-     * This can be used for example to update an external presentation
+     * <p>That can be used for example to update an external presentation
      * layer, e.g. a {@link javafx.scene.control.TextArea} or similar,
      * without replacing the whole text each time.
      *
-     * Handlers are called once with the whole evaluated value of this
-     * template when switching data contexts (parameters (0,0,text)).
-     * After that they're only called incrementally. When unbinding the
-     * data context, handlers are called once to delete the whole text
-     * (parameters (0, text.length, "")).
+     * <p>Handlers are called:
+     * <ul>
+     * <li>When being added, and if the template is bound, to insert the current
+     * value of the text. Parameters are (0, 0, {@link #getValue()}). If the template
+     * is not bound the handler is not called</li>
+     * <li>When switching data contexts:
+     * <ul>
+     * <li>If the new data context is null, parameters are (0, text.length, ""),
+     * which corresponds to a deletion of the whole text</li>
+     * <li>If the new data context is non-null, the handler is called with the
+     * parameters (0, prevText.length(), newText.length()), or (0,0, newText.length())
+     * if the previous data context was null.</li>
+     * </ul>
+     * </li>
+     * <li>When a change in the bound properties causes a change in the value
+     * of this template. Then the parameters are the smallest inferred bounds
+     * for the change. The use of a {@linkplain #isUseDiffMatchPatchStrategyProperty()
+     * patch algorithm} may scope down even more the range of the change.
+     * </li>
+     * </ul>
      *
-     * Exceptions in handlers are logged with {@link #LOGGER} but are
-     * not rethrown.
-     *
-     * TODO fix that by exposing text changes
-     * FIXME: handlers must be added BEFORE calling {@link #setDataContext(Object)},
-     * otherwise the initial replacement is lost.
+     * <p>Exceptions in handlers are logged with {@link #LOGGER} but are
+     * not rethrown, so that the value of the template stays consistent.
      *
      * @param handler the new handler to set
      *
+     * @return A subscription that removes the handler when unsubscribing
+     *
      * @throws NullPointerException if the given handler is null
+     * @see #removeReplaceHandler(ReplaceHandler)
      */
-    void addReplaceHandler(ReplaceHandler handler);
+    Subscription addReplaceHandler(ReplaceHandler handler);
 
 
     /**
@@ -113,6 +126,10 @@ public interface LiveTemplate<D> extends Val<String> {
      * Whether to use a diff-match-patch algorithm to patch only
      * the smallest changes we can find. If false, when a variable
      * changes, its whole value will be replaced in the previous text.
+     * This is enabled by default.
+     *
+     * @see #setUseDiffMatchPatchStrategy(boolean)
+     * @see #isUseDiffMatchPatchStrategy()
      */
     Var<Boolean> isUseDiffMatchPatchStrategyProperty();
 
@@ -143,7 +160,7 @@ public interface LiveTemplate<D> extends Val<String> {
      *
      * @return A new builder
      */
-    static <D> LiveTemplateBuilder<D> builder() {
+    static <D> LiveTemplateBuilder<D> newBuilder() {
         return new LiveTemplateBuilderImpl<>();
     }
 
