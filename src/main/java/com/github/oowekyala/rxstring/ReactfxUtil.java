@@ -10,6 +10,7 @@ import java.util.function.Function;
 import org.reactfx.EventStreams;
 import org.reactfx.RigidObservable;
 import org.reactfx.Subscription;
+import org.reactfx.util.TriFunction;
 import org.reactfx.value.Val;
 
 import javafx.collections.ObservableList;
@@ -29,6 +30,7 @@ final class ReactfxUtil {
     public static boolean isConst(Val<?> val) {
         return val instanceof RigidObservable;
     }
+
 
     // this breaks laziness
     public static <T, R> Val<R> mapPreserveConst(Val<? extends T> val, Function<? super T, ? extends R> f) {
@@ -125,6 +127,71 @@ final class ReactfxUtil {
             lstSub.unsubscribe();
             elemSubs.forEach(Subscription::unsubscribe);
         };
+    }
+
+
+    static <T> Subscription dynamicRecombine(ObservableList<? extends T> prevElems,
+                                             ObservableList<? extends T> elems,
+                                             // prev elt or null, new elt, index -> sub
+                                             TriFunction<? super T, ? super T, Integer, ? extends Subscription> f) {
+
+        List<Subscription> elemSubs = new ArrayList<>(elems.size());
+
+        for (int i = 0, j = 0; i < elems.size(); i++, j++) {
+            T prev = prevElems != null && j < prevElems.size() ? prevElems.get(j) : null;
+            elemSubs.add(f.apply(prev, elems.get(i), i));
+        }
+
+        Subscription lstSub = EventStreams.changesOf(elems).subscribe(ch -> {
+            while (ch.next()) {
+                if (ch.wasPermutated()) {
+                    Subscription left = elemSubs.get(ch.getFrom());
+                    Subscription right = elemSubs.set(ch.getTo(), left);
+                    elemSubs.set(ch.getFrom(), right);
+                } else {
+                    List<? extends T> removed = ch.getRemoved();
+                    int addedSize = ch.getAddedSize();
+                    int from = ch.getFrom();
+
+                    if (addedSize < removed.size()) {
+                        // oldList[from : from + removed.size] === removed
+                        for (int i = addedSize; i < removed.size(); i++) {
+                            // unsubscribe only those removed elements that don't have a matching added element
+                            elemSubs.remove(from + addedSize).unsubscribe();
+                        }
+                    }
+
+                    // newList[from : to] === addedSubList
+                    int removedIdx = 0;
+                    int i = from;
+                    for (T added : ch.getAddedSubList()) {
+                        T prev = removedIdx < removed.size() ? removed.get(removedIdx) : null;
+
+                        Subscription sub = f.apply(prev, added, i);
+                        if (prev != null) {
+                            // set bc it wasn't removed before
+                            // the un-subscription is the responsibility of the subscription maker
+                            elemSubs.set(i, sub);
+                        } else {
+                            elemSubs.add(i, sub);
+                        }
+                        i++;
+                        removedIdx++;
+                    }
+                }
+            }
+        });
+
+        return () -> {
+            lstSub.unsubscribe();
+            elemSubs.forEach(Subscription::unsubscribe);
+        };
+    }
+
+
+    interface RebindSubscription<D> extends Subscription {
+
+
     }
 
 }

@@ -1,7 +1,5 @@
 package com.github.oowekyala.rxstring;
 
-import java.util.function.Supplier;
-
 import org.reactfx.Subscription;
 import org.reactfx.collection.LiveArrayList;
 import org.reactfx.collection.LiveList;
@@ -28,33 +26,62 @@ interface BindingExtractor<D> {
      */
     // on pourrait dispatcher mais ballec
     default Subscription bindSingleVal(LiveTemplate<?> parent,
+                                       Val<String> previous,
                                        Val<String> val,
-                                       Supplier<Integer> absoluteOffset,
+                                       ValIdx valIdx,
                                        ReplaceHandler callback) {
 
-        if (val instanceof LiveTemplateImpl) {
+        if (previous == null) {
+            String initialValue = val.getValue();
+            // insert it whole
+            callback.replace(0, 0, initialValue == null ? "" : initialValue);
+        }
 
+        Subscription sub = null;
+
+        if (val instanceof LiveTemplateImpl) {
             LiveTemplateImpl<?> subTemplate = (LiveTemplateImpl<?>) val;
+
+            if (previous instanceof LiveTemplateImpl) {
+                // rebind the existing subtemplate
+                LiveTemplateImpl<?> existing = (LiveTemplateImpl<?>) previous;
+
+                existing.importConfigFrom(parent);
+                Subscription handler = existing.addInternalReplaceHandler(callback);
+                Subscription rebindResult = existing.rebind(subTemplate);
+
+                if (rebindResult != null) {
+                    return handler.and(rebindResult);
+                } // else initialise the template anyway
+            }
+
+            // initialise a new subtemplate
 
             // the subtemplate inherits some config properties from its outer parents,
             // eg whether to use a patch strategy
             subTemplate.importConfigFrom(parent);
             // add a replace handler to the bound value of the child
 
-            return subTemplate.addInternalReplaceHandler(callback.withOffset(absoluteOffset))
-                              .and(() -> {
-                                  subTemplate.dataContextProperty().unbind();
-                                  subTemplate.setDataContext(null);
-                              });
+            sub = subTemplate.addInternalReplaceHandler(callback)
+                             .and(() -> {
+                                 subTemplate.dataContextProperty().unbind();
+                                 subTemplate.setDataContext(null);
+                             });
         } else {
-            return val.orElseConst("") // so that the values in changes are never null
-                      .changes()
-                      .subscribe(change -> {
-                          int startOffset = absoluteOffset.get();
-                          int endOffset = startOffset + change.getOldValue().length();
-                          callback.replace(startOffset, endOffset, change.getNewValue());
-                      });
+
+            sub = val.orElseConst("") // so that the values in changes are never null
+                     .changes()
+                     .subscribe(change -> callback.replace(0, change.getOldValue().length(), change.getNewValue()));
         }
+
+        if (previous != null) {
+            String initialValue = val.getValue();
+            int prevLength = valIdx.length();
+            // replace previous
+            callback.replace(0, prevLength, initialValue == null ? "" : initialValue);
+
+        }
+        return sub;
     }
 
 

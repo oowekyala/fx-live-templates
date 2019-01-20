@@ -1,5 +1,7 @@
 package com.github.oowekyala.rxstring;
 
+import static com.github.oowekyala.rxstring.BindingExtractor.ConstantBinding;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -49,12 +51,17 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     // are shifted right once, which affects their innerIdx
     // These are local to each sequence
     private final List<List<ValIdx>> mySequences;
+    // indices of the constant bindings, which don't need to be rebound
+    // those are 1-to-1 with myOuterOffsets
+    private final boolean[] myConstantIndices;
+    /** The bindings that specify this template. Used for rebinding. */
+    private final List<BindingExtractor<D>> myBindings;
+    private final List<Subscription> mySequenceSubscriptions;
+    private final List<ObservableList<Val<String>>> myPrevSequences;
 
-    private final Subscription myCurCtxSubscription;
     private final StringBuffer myStringBuffer;
     private final EventSource<?> myInvalidations = new EventSource<>();
-    private final List<ReplaceHandler> myUserHandler;
-    private final List<ReplaceHandler> myInternalReplaceHandlers;
+    private final Handlers myReplaceHandlers;
     /** The template that spawned this bound template. */
     private final LiveTemplate<D> myParent;
     private boolean isPushInvalidations;
@@ -72,24 +79,19 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
         // the size of these is absolutely constant
         this.myOuterOffsets = new int[bindings.size()];
+        this.myConstantIndices = new boolean[bindings.size()];
         this.mySequences = new ArrayList<>(Collections.nCopies(bindings.size(), null));
+        this.mySequenceSubscriptions = new ArrayList<>(Collections.nCopies(bindings.size(), null));
+        this.myPrevSequences = new ArrayList<>(Collections.nCopies(bindings.size(), null));
+        this.myBindings = bindings;
 
         this.myStringBuffer = new StringBuffer();
-        this.myInternalReplaceHandlers = internalReplaceHandlers;
-        this.myUserHandler = userReplaceHandler;
+        this.myReplaceHandlers = new Handlers(userReplaceHandler, internalReplaceHandlers);
 
-        Subscription subscription = () -> {};
-
-        for (int i = 0; i < myOuterOffsets.length; i++) {
-            subscription = subscription.and(
-                initSequence(dataContext, bindings.get(i), i)
-            );
-        }
-
+        bindTo(dataContext, myReplaceHandlers, false);
         this.isPushInvalidations = true;
-        this.myCurCtxSubscription = subscription;
 
-        notifyListenersOfReplace(ReplacementStrategy.replacing(0, 0, myStringBuffer.toString()));
+        myReplaceHandlers.notifyListenersOfReplace(ReplacementStrategy.replacing(0, 0, myStringBuffer.toString()));
     }
 
 
@@ -98,30 +100,35 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         return "BoundLiveTemplate{" +
             "myStringBuffer=" + myStringBuffer +
             ", myOuterOffsets=" + Arrays.toString(myOuterOffsets) +
-            ", myUserHandlers=" + myUserHandler +
-            ", myInternalReplaceHandlers=" + myInternalReplaceHandlers +
             '}';
-    }
-
-
-    /**
-     * Notify the parent template and the user replace handlers of a replacement
-     * using the given replacement strategy. The strategy encapsulates the parameters
-     * to be passed to each handler. See {@link #getReplacementStrategy(int, int, String)}
-     * and {@link ReplacementStrategy#replacing(int, int, String)}.
-     */
-    private void notifyListenersOfReplace(ReplacementStrategy strategy) {
-        myInternalReplaceHandlers.forEach(h -> strategy.apply(h, false));
-        myUserHandler.forEach(h -> strategy.apply(h, true));
     }
 
 
     void unbind() {
         // notify everyone that the template was deleted but only once
-        notifyListenersOfReplace(ReplacementStrategy.replacing(0, myStringBuffer.length(), ""));
+        myReplaceHandlers.notifyListenersOfReplace(ReplacementStrategy.replacing(0, myStringBuffer.length(), ""));
 
         isPushInvalidations = false; // avoid pushing every intermediary state as a value
-        myCurCtxSubscription.unsubscribe();
+        mySequenceSubscriptions.forEach(Subscription::unsubscribe);
+    }
+
+
+    void rebind(D dataContext, Handlers handlers) {
+        bindTo(dataContext, handlers, true);
+    }
+
+
+    private void bindTo(D dataContext, Handlers handlers, boolean isRebind) {
+        for (int i = 0; i < myOuterOffsets.length; i++) {
+            // only reevaluate the thing if it's not constant
+            if (!myConstantIndices[i]) {
+                if (mySequenceSubscriptions.get(i) != null) {
+                    mySequenceSubscriptions.get(i).unsubscribe();
+                }
+                Subscription subToNewCtx = initSequence(dataContext, handlers, myBindings.get(i), i, isRebind);
+                mySequenceSubscriptions.set(i, subToNewCtx);
+            }
+        }
     }
 
 
@@ -167,7 +174,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     }
 
 
-    private void handleContentChange(ValIdx valIdx, int start, int end, String value) {
+    private void handleContentChange(ValIdx valIdx, Handlers handlersHolder, int start, int end, String value) {
         if (start == end && value.isEmpty()) {
             // don't fire an event for nothing
             return;
@@ -181,7 +188,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
         if (isPushInvalidations) {
             // propagate the change to the templates that contain this one
-            notifyListenersOfReplace(replacementStrategy);
+            handlersHolder.notifyListenersOfReplace(replacementStrategy);
             myInvalidations.push(null);
         }
     }
@@ -196,49 +203,77 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
      * Initialises the whole sequence at index outerIdx. Returns the subscription that unsubscribes
      * all elements of the sequence.
      */
-    private Subscription initSequence(D context, BindingExtractor<D> bindingExtractor, int outerIdx) {
-        myOuterOffsets[outerIdx] = myStringBuffer.length();
+    private Subscription initSequence(D context, Handlers handlers, BindingExtractor<D> bindingExtractor, int outerIdx, boolean isRebind) {
 
+        if (!myConstantIndices[outerIdx] && bindingExtractor instanceof ConstantBinding) {
+            // then we're initialising for the first time
+            myConstantIndices[outerIdx] = true;
+        } else if (myConstantIndices[outerIdx]) {
+            // subscriptions to constants are unimportant anyway
+            return Subscription.EMPTY;
+        }
+
+        ObservableList<Val<String>> prevList = myPrevSequences.get(outerIdx); // may be null
+
+        // whether rebind or not we have to extract the list from the up-to-date data context
         ObservableList<Val<String>> lst = bindingExtractor.extract(context).filtered(v -> !isIgnorable(v));
-        mySequences.set(outerIdx, new ArrayList<>(lst.size()));
+        myPrevSequences.set(outerIdx, lst);
 
-        return ReactfxUtil.dynamic(lst, (elt, innerIdx) -> initVal(bindingExtractor, elt, outerIdx, innerIdx));
+        if (!isRebind) {
+            // if it's a rebind then those have already been initialized
+            myOuterOffsets[outerIdx] = myStringBuffer.length();
+            mySequences.set(outerIdx, new ArrayList<>(lst.size()));
+        }
+
+        return ReactfxUtil.dynamicRecombine(prevList, lst, (prev/*may be null*/, elt, innerIdx) -> initVal(bindingExtractor, handlers, prev, elt, outerIdx, innerIdx));
     }
 
 
     /**
      * Initialises a single Val in a sequence at the given indices.
      */
-    private Subscription initVal(BindingExtractor<D> origin, Val<String> stringSource, int outerIdx, int innerIdx) {
+    private Subscription initVal(BindingExtractor<D> origin, Handlers handlers, Val<String> previous/*may be null*/, Val<String> stringSource, int outerIdx, int innerIdx) {
         // sequence bindings will call this method when their content has changed
 
         // this thing is captured which allows its indices to remain up to date
-        ValIdx valIdx = insertBindingAt(outerIdx, innerIdx);
-        String initialValue = stringSource.getValue();
-        int abs = valIdx.currentAbsoluteOffset();
+        ValIdx valIdx = insertBindingAt(outerIdx, innerIdx, previous != null);
 
-        handleContentChange(valIdx, abs, abs, initialValue == null ? "" : initialValue);
+        ReplaceHandler relativeToVal = (start, end, value) -> handleContentChange(valIdx, handlers, start, end, value);
+
+        boolean shouldDelete = true;//previous == null || !Objects.equals(previous.getValue(), stringSource.getValue());
 
         return origin.bindSingleVal(myParent,
+                                    previous,
                                     stringSource,
-                                    valIdx::currentAbsoluteOffset,
-                                    (start, end, value) -> handleContentChange(valIdx, start, end, value))
-                     // part of the subscription
-                     .and(() -> deleteBindingAt(valIdx));
+                                    valIdx,
+                                    relativeToVal.withOffset(valIdx::currentAbsoluteOffset))
+                     .and(() -> {
+                         if (shouldDelete) {
+                             deleteBindingAt(valIdx, handlers);
+                         }
+                     });
     }
 
 
-    private void deleteBindingAt(ValIdx idx) {
+    private void deleteBindingAt(ValIdx idx, Handlers handlers) {
 
         int start = idx.currentAbsoluteOffset();
         int deletedLength = idx.length();
-        handleContentChange(idx, start, start + deletedLength, "");
+        handleContentChange(idx, handlers, start, start + deletedLength, "");
 
         idx.delete();
     }
 
 
-    private ValIdx insertBindingAt(int outerIdx, int innerIdx) {
+    private ValIdx insertBindingAt(int outerIdx, int innerIdx, boolean overwrite) {
+        if (overwrite) {
+            List<ValIdx> seq = mySequences.get(outerIdx);
+            if (innerIdx < seq.size()) {
+                // gets the existing binding
+                return seq.get(innerIdx);
+            }
+        }
+
         return new ValIdx(myOuterOffsets, myStringBuffer, outerIdx, innerIdx, mySequences.get(outerIdx));
     }
 
@@ -254,6 +289,36 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
         static ReplacementStrategy replacing(int start, int end, String value) {
             return (handler, canFail) -> handler.unfailing(canFail).replace(start, end, value);
+        }
+    }
+
+    static class Handlers {
+
+        private final List<ReplaceHandler> myUserHandler;
+        private final List<ReplaceHandler> myInternalReplaceHandlers;
+
+
+        Handlers(List<ReplaceHandler> myUserHandler,
+                 List<ReplaceHandler> myInternalReplaceHandlers) {
+            this.myUserHandler = myUserHandler;
+            this.myInternalReplaceHandlers = myInternalReplaceHandlers;
+        }
+
+
+        /**
+         * Notify the parent template and the user replace handlers of a replacement
+         * using the given replacement strategy. The strategy encapsulates the parameters
+         * to be passed to each handler. See {@link #getReplacementStrategy(int, int, String)}
+         * and {@link ReplacementStrategy#replacing(int, int, String)}.
+         */
+        private void notifyListenersOfReplace(ReplacementStrategy strategy) {
+            myInternalReplaceHandlers.forEach(h -> strategy.apply(h, false));
+            myUserHandler.forEach(h -> strategy.apply(h, true));
+        }
+
+
+        public Handlers freeze() {
+            return new Handlers(myUserHandler, new ArrayList<>(myInternalReplaceHandlers));
         }
     }
 }

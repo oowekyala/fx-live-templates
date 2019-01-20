@@ -10,6 +10,8 @@ import org.reactfx.Subscription;
 import org.reactfx.value.Val;
 import org.reactfx.value.Var;
 
+import com.github.oowekyala.rxstring.BoundLiveTemplate.Handlers;
+
 
 /**
  * Implementation for {@link LiveTemplate}. Basically contains logic to switch
@@ -35,11 +37,12 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
 
         myDataContext.values().subscribe(newCtx -> {
 
-            myCurBound.ifPresent(BoundLiveTemplate::unbind);
-
-            if (newCtx != null) {
+            if (myCurBound.isPresent() && newCtx != null) {
+                myCurBound.getValue().rebind(newCtx, new Handlers(myUserReplaceHandlers, myInternalReplaceHandlers));
+            } else if (newCtx != null) {
                 myCurBound.setValue(new BoundLiveTemplate<>(newCtx, this, dataBinder, myUserReplaceHandlers, myInternalReplaceHandlers));
             } else {
+                myCurBound.ifPresent(BoundLiveTemplate::unbind);
                 myCurBound.setValue(null);
             }
         });
@@ -50,7 +53,17 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
 
     Subscription addInternalReplaceHandler(ReplaceHandler handler) {
         myInternalReplaceHandlers.add(handler);
-        return () -> myInternalReplaceHandlers.remove(handler);
+        return Subscription.EMPTY;
+        //        return () -> myInternalReplaceHandlers.remove(handler);
+    }
+
+
+    @SuppressWarnings("unchecked")
+    Subscription rebind(LiveTemplateImpl<?> other/*non null*/) {
+        BoundLiveTemplate<D> current = myCurBound.getValue();
+        setDataContext((D) other.getDataContext());
+        // the bindings of the this template to its current data context are unsubscribed
+        return current::unbind;
     }
 
 
