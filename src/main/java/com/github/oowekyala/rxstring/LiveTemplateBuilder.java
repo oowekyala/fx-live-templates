@@ -13,6 +13,7 @@ import org.reactfx.value.Val;
 
 import javafx.beans.value.ObservableValue;
 import javafx.collections.ObservableList;
+import javafx.util.Callback;
 
 
 /**
@@ -294,12 +295,16 @@ public interface LiveTemplateBuilder<D> {
      * itself produces live templates, then the minimal changes from that template will be
      * forwarded, so the changes will be even finer.
      *
+     *
      * <p>Using a seq renderer allows you the most configurability.
      *
-     * <p>Note: the {@linkplain #withDefaultEscape(Function) default escape function}
+     * <p><b>Note:</b> the {@linkplain #withDefaultEscape(Function) default escape function}
      * is not applied to the items of this list.
      *
-     * FIXME this doesn't play well with JavaFX's native ListProperty because it fires too many events
+     * <p><b>Important note:</b> don't use an observable lists that track updates to their elements
+     * like {@link javafx.collections.FXCollections#observableArrayList(Callback)} does. ReactFX
+     * doesn't handle these update events and considers them as additions, so the same element
+     * will be treated as if it was added several times.
      *
      * @param <T>       Type of items of the list
      * @param extractor List extractor
@@ -328,7 +333,8 @@ public interface LiveTemplateBuilder<D> {
      */
     default <T> LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<? extends T>> extractor,
                                                ItemRenderer<? super T> renderer) {
-        return bindSeq(extractor, SeqRenderer.forItems(renderer.escapeWith(getDefaultEscapeFunction())));
+        return bindSeq(extractor.andThen(l -> LiveList.map(l, Function.identity())),
+                       SeqRenderer.forItems(renderer.escapeWith(getDefaultEscapeFunction())));
     }
 
 
