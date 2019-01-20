@@ -8,13 +8,14 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import org.reactfx.EventStreams;
+import org.reactfx.RigidObservable;
 import org.reactfx.Subscription;
+import org.reactfx.value.Val;
 
 import javafx.collections.ObservableList;
 
 
 /**
- * Ersatz until reactfx merges my PR.
  *
  * @author Clément Fournier
  * @since 1.0
@@ -23,6 +24,16 @@ final class ReactfxUtil {
 
     private ReactfxUtil() {
 
+    }
+
+
+    public static boolean isConst(Val<?> val) {
+        return val instanceof RigidObservable;
+    }
+
+
+    public static <T, R> Val<R> mapPreserveConst(Val<? extends T> val, Function<? super T, ? extends R> f) {
+        return isConst(val) ? Val.constant(f.apply(val.getValue())) : val.map(f);
     }
 
 
@@ -67,6 +78,7 @@ final class ReactfxUtil {
      * subscriptions are unsubscribed as well, and no new elementary
      * subscriptions will be created.
      */
+    // Until ReactFX merges my PR
     static <T> Subscription dynamic(ObservableList<? extends T> elems,
                                     BiFunction<? super T, Integer, ? extends Subscription> f) {
 

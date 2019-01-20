@@ -9,11 +9,11 @@ import java.util.Objects;
 
 import org.reactfx.EventSource;
 import org.reactfx.Subscription;
-import org.reactfx.collection.LiveList;
 import org.reactfx.value.Val;
 import org.reactfx.value.ValBase;
 
 import com.github.oowekyala.rxstring.diff_match_patch.Patch;
+import javafx.collections.transformation.FilteredList;
 
 
 /**
@@ -123,6 +123,12 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     // for construction
 
 
+    // test only
+    long totalSubscriptions() {
+        return mySequences.stream().flatMap(List::stream).count();
+    }
+
+
     private ReplacementStrategy getReplacementStrategy(int start, int end, String value) {
         if (myParent.isUseDiffMatchPatchStrategy()) {
             DiffMatchPatchWithHooks dmp = new DiffMatchPatchWithHooks();
@@ -141,6 +147,11 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
 
     private void handleContentChange(ValIdx valIdx, int start, int end, String value) {
+        if (start == end && value.isEmpty()) {
+            // don't fire an event for nothing
+            return;
+        }
+
         ReplacementStrategy replacementStrategy = getReplacementStrategy(start, end, value);
 
         replacementStrategy.apply(myStringBuffer::replace, false);
@@ -157,10 +168,15 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     }
 
 
+    private boolean isIgnorable(Val<String> val) {
+        return ReactfxUtil.isConst(val) && (val.isEmpty() || val.getValue().isEmpty());
+    }
+
+
     private Subscription initBinding(D context, BindingExtractor<D> bindingExtractor, int outerIdx) {
         myOuterOffsets[outerIdx] = myStringBuffer.length();
 
-        LiveList<Val<String>> lst = bindingExtractor.extract(context);
+        FilteredList<Val<String>> lst = bindingExtractor.extract(context).filtered(v -> !isIgnorable(v));
         mySequences.set(outerIdx, new ArrayList<>(lst.size()));
 
         return ReactfxUtil.dynamic(lst, (elt, innerIdx) -> initVal(bindingExtractor, elt, outerIdx, innerIdx));

@@ -8,7 +8,6 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import org.reactfx.Subscription;
-import org.reactfx.collection.LiveArrayList;
 import org.reactfx.collection.LiveList;
 import org.reactfx.value.Val;
 
@@ -287,8 +286,15 @@ public interface LiveTemplateBuilder<D> {
     /**
      * Binds a property of the data context that returns an observable list of items.
      * The list will be mapped to a list of strings with the with the specified {@link SeqRenderer}.
-     * Most of the time you'll want to use {@link #bindSeq(Function, ItemRenderer)},
-     * this overload is mostly there for code organisation.
+     *
+     *
+     * <p>Changes in individual items of the list are reflected in the value of the template.
+     * Only minimal changes are pushed: items are rendered incrementally (ie the whole list
+     * is not rendered every time there's a change in one item). If the renderer function
+     * itself produces live templates, then the minimal changes from that template will be
+     * forwarded, so the changes will be even finer.
+     *
+     * <p>Using a seq renderer allows you the most configurability.
      *
      * <p>Note: the {@linkplain #withDefaultEscape(Function) default escape function}
      * is not applied to the items of this list.
@@ -311,12 +317,8 @@ public interface LiveTemplateBuilder<D> {
     /**
      * Binds a property of the data context that returns an observable list of items.
      * Each item will be mapped to a string using the specified {@link ItemRenderer}.
-     *
-     * <p>Changes in individual items of the list are reflected in the value of the template.
-     * Only minimal changes are pushed: items are rendered incrementally (ie the whole list
-     * is not rendered every time there's a change in one item). If the renderer function
-     * itself produces live templates, then the minimal changes from that template will be
-     * forwarded, so the changes will be even finer.
+     * To have a delimited list, use {@link #bindSeq(Function, SeqRenderer)} with
+     * {@link SeqRenderer#delimited(ItemRenderer, String, String, String)}.
      *
      * @param <T>       Type of items of the list
      * @param extractor List extractor
@@ -326,7 +328,7 @@ public interface LiveTemplateBuilder<D> {
      */
     default <T> LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<? extends T>> extractor,
                                                ItemRenderer<? super T> renderer) {
-        return bindSeq(extractor, renderer.escapeWith(getDefaultEscapeFunction()).toSeq());
+        return bindSeq(extractor, SeqRenderer.forItems(renderer.escapeWith(getDefaultEscapeFunction())));
     }
 
 

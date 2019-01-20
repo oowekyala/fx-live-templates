@@ -228,7 +228,7 @@ class LiveTemplateBuilderTest : FunSpec({
 
         val lt =
                 LiveTemplate.builder<DContext>()
-                        .append("<top nums='").bindSeq({ it.nums }, ItemRenderer.asString<Int>().toSeq().delimited("[", "]", ",")).append("'/>")
+                        .append("<top nums='").bindSeq({ it.nums }, SeqRenderer.delimited(ItemRenderer.asString(), "[", "]", ",")).append("'/>")
                         .toBoundTemplate(DContext())
 
         lt.value shouldBe """
@@ -283,12 +283,41 @@ class LiveTemplateBuilderTest : FunSpec({
             <top nums='[2,2,2]'/>
         """.trimIndent()
 
-        lt.dataContext.nums.add(0,4)
+        lt.dataContext.nums.add(0, 4)
 
-        // FIXME
         lt.value shouldBe """
             <top nums='[4,2,2,2]'/>
         """.trimIndent()
+
+    }
+
+    test("Test empty string constants are pruned") {
+
+        class DContext {
+            val nums = FXCollections.observableArrayList(10, 15)
+        }
+
+        val lt =
+                LiveTemplate.builder<DContext>()
+                        .append("<top nums='").bindSeq({ it.nums }, SeqRenderer.delimited(ItemRenderer.asString(), "", "", ",")).append("'/>")
+                        .toBoundTemplate(DContext())
+
+        (lt as LiveTemplateImpl).totalSubscriptions().value shouldBe 5L
+
+    }
+
+    test("Test null string constants are pruned") {
+
+        class DContext {
+            val nums = FXCollections.observableArrayList(10, 15)
+        }
+
+        val lt =
+                LiveTemplate.builder<DContext>()
+                        .append("<top nums='").bindSeq({ it.nums }) { null }.append("'/>")
+                        .toBoundTemplate(DContext())
+
+        (lt as LiveTemplateImpl).totalSubscriptions().value shouldBe 2L
 
     }
 

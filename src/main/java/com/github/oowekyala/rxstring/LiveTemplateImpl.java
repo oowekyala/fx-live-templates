@@ -108,4 +108,11 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
         this.setUseDiffMatchPatchStrategy(liveTemplate.isUseDiffMatchPatchStrategy());
     }
 
+
+    // test only
+    Val<Long> totalSubscriptions() {
+        return myCurBound.map(BoundLiveTemplate::totalSubscriptions);
+    }
+
+
 }

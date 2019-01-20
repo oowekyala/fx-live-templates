@@ -19,7 +19,7 @@ public class SeqRenderer<T> implements Function<ObservableList<? extends T>, Liv
     private final Function<? super ObservableList<? extends T>, ? extends LiveList<Val<String>>> myFun;
 
 
-    SeqRenderer(Function<? super ObservableList<? extends T>, ? extends LiveList<Val<String>>> fun) {
+    private SeqRenderer(Function<? super ObservableList<? extends T>, ? extends LiveList<Val<String>>> fun) {
         myFun = fun;
     }
 
@@ -52,7 +52,20 @@ public class SeqRenderer<T> implements Function<ObservableList<? extends T>, Liv
      * @return A delimited seq renderer
      */
     public static <T> SeqRenderer<T> delimited(ItemRenderer<T> itemRenderer, String prefix, String suffix, String delim) {
-        return itemRenderer.toSeq().delimited(prefix, suffix, delim);
+        return forItems(itemRenderer).delimited(prefix, suffix, delim);
+    }
+
+
+    /**
+     * A seq renderer that renders all its elements with the given item renderer.
+     *
+     * @param itemRenderer Renderer for items
+     * @param <T>          Type of items
+     *
+     * @return A simple seq renderer
+     */
+    public static <T> SeqRenderer<T> forItems(ItemRenderer<T> itemRenderer) {
+        return new SeqRenderer<>(seq -> LiveList.map(seq, itemRenderer));
     }
 
 }

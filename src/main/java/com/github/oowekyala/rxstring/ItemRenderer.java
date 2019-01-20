@@ -3,7 +3,6 @@ package com.github.oowekyala.rxstring;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import org.reactfx.collection.LiveList;
 import org.reactfx.value.Val;
 
 import javafx.beans.value.ObservableValue;
@@ -47,15 +46,7 @@ public class ItemRenderer<T> implements Function<T, Val<String>> {
      * @return A new renderer
      */
     public ItemRenderer<T> escapeWith(Function<String, String> escapeFun) {
-        return myNoEscape ? this : new ItemRenderer<>(/* ignoreEscape */true, myFun.andThen(v -> v.map(escapeFun)));
-    }
-
-
-    /**
-     * Lifts this renderer to a {@link SeqRenderer}.
-     */
-    SeqRenderer<T> toSeq() {
-        return new SeqRenderer<>(seq -> LiveList.map(seq, this));
+        return myNoEscape ? this : new ItemRenderer<>(/* ignoreEscape */true, myFun.andThen(v -> ReactfxUtil.mapPreserveConst(v, escapeFun)));
     }
 
 
@@ -103,7 +94,7 @@ public class ItemRenderer<T> implements Function<T, Val<String>> {
      * @param <T>          Type of values this renderer can handle
      */
     public static <T> ItemRenderer<T> mappingObservable(Function<? super T, ? extends ObservableValue<String>> fun, boolean ignoreEscape) {
-        return new ItemRenderer<>(false, fun.andThen(Val::wrap));
+        return new ItemRenderer<>(ignoreEscape, fun.andThen(Val::wrap));
     }
 
 
