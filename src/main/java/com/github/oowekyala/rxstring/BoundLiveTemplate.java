@@ -89,7 +89,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         this.isPushInvalidations = true;
         this.myCurCtxSubscription = subscription;
 
-        myUserHandler.stream().map(ReplaceHandler::unfailing).forEach(h -> h.replace(0, 0, myStringBuffer.toString()));
+        notifyListenersOfReplace(ReplacementStrategy.replacing(0, 0, myStringBuffer.toString()));
     }
 
 
@@ -104,12 +104,21 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     }
 
 
+    /**
+     * Notify the parent template and the user replace handlers of a replacement
+     * using the given replacement strategy. The strategy encapsulates the parameters
+     * to be passed to each handler. See {@link #getReplacementStrategy(int, int, String)}
+     * and {@link ReplacementStrategy#replacing(int, int, String)}.
+     */
+    private void notifyListenersOfReplace(ReplacementStrategy strategy) {
+        myInternalReplaceHandlers.forEach(h -> strategy.apply(h, false));
+        myUserHandler.forEach(h -> strategy.apply(h, true));
+    }
+
+
     void unbind() {
-        int myLength = myStringBuffer.length();
-        // notify user subscribers that everything was deleted
-        myUserHandler.stream().map(ReplaceHandler::unfailing).forEach(h -> h.replace(0, myLength, ""));
-        // notify parent that the sub template was deleted but only once
-        myInternalReplaceHandlers.forEach(h -> h.replace(0, myLength, ""));
+        // notify everyone that the template was deleted but only once
+        notifyListenersOfReplace(ReplacementStrategy.replacing(0, myStringBuffer.length(), ""));
 
         isPushInvalidations = false; // avoid pushing every intermediary state as a value
         myCurCtxSubscription.unsubscribe();
@@ -136,16 +145,22 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
 
     private ReplacementStrategy getReplacementStrategy(int start, int end, String value) {
+        String prevSlice = myStringBuffer.substring(start, end);
+        if (prevSlice.equals(value)) {
+            return (base, canFail) -> {
+                // nothing to replace
+            };
+        }
+
         if (myParent.isUseDiffMatchPatchStrategy()) {
             DiffMatchPatchWithHooks dmp = new DiffMatchPatchWithHooks();
-            String prevSlice = myStringBuffer.substring(start, end);
 
-            // the ordering of the unfailing() calls affects output line numbers and stuff
+            // the unfailing() call must be placed after withOffset
 
             if (!prevSlice.isEmpty() && !value.isEmpty()) {
                 LinkedList<Patch> patches = dmp.patchMake(prevSlice, value);
                 return (base, canFail) -> dmp.patchApply(patches, prevSlice, base.withOffset(start).unfailing(canFail));
-            } // else return the normal callback, bc the replace is trivial
+            } // else return the normal callback, bc the replace is trivial (full deletion | full insertion)
         }
 
         return (base, canFail) -> base.unfailing(canFail).replace(start, end, value);
@@ -166,9 +181,8 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
         if (isPushInvalidations) {
             // propagate the change to the templates that contain this one
-            myInternalReplaceHandlers.forEach(h -> replacementStrategy.apply(h, false));
+            notifyListenersOfReplace(replacementStrategy);
             myInvalidations.push(null);
-            myUserHandler.forEach(h -> replacementStrategy.apply(h, true));
         }
     }
 
@@ -227,7 +241,15 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
     @FunctionalInterface
     private interface ReplacementStrategy {
-        /** Applies the given replace handler. */
+        /**
+         * Applies the given replace handler. The strategy captures the parameters
+         * to be passed to the handler.
+         */
         void apply(ReplaceHandler handler, boolean logExceptionsButDontFail);
+
+
+        static ReplacementStrategy replacing(int start, int end, String value) {
+            return (handler, canFail) -> handler.unfailing(canFail).replace(start, end, value);
+        }
     }
 }

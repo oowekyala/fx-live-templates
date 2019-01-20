@@ -50,7 +50,8 @@ public interface ReplaceHandler {
             try {
                 replace(start, end, value);
             } catch (Exception e) {
-                LiveTemplate.LOGGER.log(Level.WARNING, e, () -> "An exception was thrown by an external replacement handler");
+                LiveTemplate.LOGGER.log(Level.WARNING, e, () -> "An exception was thrown by an external "
+                    + "replacement handler during replacement (" + start + ", " + end + ", \"" + value + "\")");
             }
         };
     }
