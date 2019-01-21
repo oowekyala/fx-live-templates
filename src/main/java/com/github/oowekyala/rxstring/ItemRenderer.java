@@ -140,12 +140,12 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
 
     private static class TemplatedItemRenderer<T> extends ItemRenderer<T> {
 
-        private final Consumer<LiveTemplateBuilder<T>> subTemplateBuilder;
-        private LiveTemplate<T> subTemplate;
+        private final Consumer<LiveTemplateBuilder<T>> subTemplateBuilderSpec;
+        private LiveTemplateBuilder<T> subTemplateBuilder;
 
 
         TemplatedItemRenderer(LiveTemplateBuilder<?> parent, Consumer<LiveTemplateBuilder<T>> subtemplateBuilder) {
-            this.subTemplateBuilder = subtemplateBuilder;
+            this.subTemplateBuilderSpec = subtemplateBuilder;
 
         }
 
@@ -158,22 +158,19 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
 
         @Override
         public Val<String> apply(LiveTemplateBuilder<?> parent, ObservableValue<? extends T> tObs) {
-            if (subTemplate == null) {
+            if (subTemplateBuilder == null) {
                 LiveTemplateBuilder<T> childBuilder = parent instanceof LiveTemplateBuilderImpl
                                                       ? ((LiveTemplateBuilderImpl) parent).spawnChildWithSameConfig()
                                                       : LiveTemplate.newBuilder();
 
-                subTemplateBuilder.accept(childBuilder);
+                subTemplateBuilderSpec.accept(childBuilder);
                 // only build the template once
-                subTemplate = childBuilder.toBoundTemplate(tObs.getValue());
+                subTemplateBuilder = childBuilder;
             }
-            if (!ReactfxUtil.isConst(tObs)) {
-                subTemplate.dataContextProperty().unbind();
-                subTemplate.dataContextProperty().bind(tObs);
+            LiveTemplate<T> subTemplate = subTemplateBuilder.toTemplate();
+            subTemplate.dataContextProperty().unbind();
+            subTemplate.dataContextProperty().bind(tObs);
 
-            } else {
-                subTemplate.setDataContext(tObs.getValue());
-            }
             return subTemplate;
         }
     }

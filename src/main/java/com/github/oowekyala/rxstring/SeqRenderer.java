@@ -6,6 +6,7 @@ import java.util.function.Function;
 import org.reactfx.collection.LiveList;
 import org.reactfx.value.Val;
 
+import javafx.beans.value.ObservableValue;
 import javafx.collections.ObservableList;
 
 
@@ -14,25 +15,25 @@ import javafx.collections.ObservableList;
  *
  * @param <T> Type of values of the list
  */
-public class SeqRenderer<T> implements BiFunction<LiveTemplateBuilder<?>, ObservableList<? extends T>, LiveList<Val<String>>> {
+public class SeqRenderer<T> implements BiFunction<LiveTemplateBuilder<?>, ObservableList<? extends ObservableValue<? extends T>>, LiveList<Val<String>>> {
 
 
-    private final BiFunction<? super LiveTemplateBuilder<?>, ? super ObservableList<? extends T>, ? extends LiveList<Val<String>>> myFun;
+    private final BiFunction<? super LiveTemplateBuilder<?>, ? super ObservableList<? extends ObservableValue<? extends T>>, ? extends LiveList<Val<String>>> myFun;
 
 
-    private SeqRenderer(BiFunction<? super LiveTemplateBuilder<?>, ? super ObservableList<? extends T>, ? extends LiveList<Val<String>>> myFun) {
+    private SeqRenderer(BiFunction<? super LiveTemplateBuilder<?>, ? super ObservableList<? extends ObservableValue<? extends T>>, ? extends LiveList<Val<String>>> myFun) {
         this.myFun = myFun;
     }
 
 
     /** Doesn't use the context. */
-    private SeqRenderer(Function<? super ObservableList<? extends T>, ? extends LiveList<Val<String>>> fun) {
+    private SeqRenderer(Function<? super ObservableList<? extends ObservableValue<? extends T>>, ? extends LiveList<Val<String>>> fun) {
         this((ctx, lst) -> fun.apply(lst));
     }
 
 
     @Override
-    public LiveList<Val<String>> apply(LiveTemplateBuilder<?> context, ObservableList<? extends T> ts) {
+    public LiveList<Val<String>> apply(LiveTemplateBuilder<?> context, ObservableList<? extends ObservableValue<? extends T>> ts) {
         return myFun.apply(context, ts);
     }
 
@@ -72,7 +73,7 @@ public class SeqRenderer<T> implements BiFunction<LiveTemplateBuilder<?>, Observ
      * @return A simple seq renderer
      */
     public static <T> SeqRenderer<T> forItems(ItemRenderer<? super T> itemRenderer) {
-        return new SeqRenderer<>((ctx, seq) -> LiveList.map(seq, Val::constant).map(tVal -> itemRenderer.apply(ctx, tVal)));
+        return new SeqRenderer<>((ctx, seq) -> LiveList.map(seq, tObs -> itemRenderer.apply(ctx, tObs)));
     }
 
 }

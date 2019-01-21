@@ -14,6 +14,7 @@ import org.reactfx.Subscription;
 import org.reactfx.value.Val;
 import org.reactfx.value.ValBase;
 
+import com.github.oowekyala.rxstring.ReactfxUtil.RebindSubscription;
 import com.github.oowekyala.rxstring.diff_match_patch.Patch;
 import javafx.collections.ObservableList;
 
@@ -56,7 +57,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     private final boolean[] myConstantIndices;
     /** The bindings that specify this template. Used for rebinding. */
     private final List<BindingExtractor<D>> myBindings;
-    private final List<Subscription> mySequenceSubscriptions;
+    private final List<RebindSubscription<ObservableList<Val<String>>>> mySequenceSubscriptions;
     private final List<ObservableList<Val<String>>> myPrevSequences;
 
     private final StringBuffer myStringBuffer;
@@ -122,12 +123,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         for (int i = 0; i < myOuterOffsets.length; i++) {
             // only reevaluate the thing if it's not constant
             if (!myConstantIndices[i]) {
-                Subscription subToNewCtx = initSequence(dataContext, handlers, myBindings.get(i), i, isRebind);
-                Subscription oldSub = mySequenceSubscriptions.set(i, subToNewCtx);
-                if (oldSub != null) {
-                    // unsubscribing after, so that signalDontDelete happens before
-                    oldSub.unsubscribe();
-                }
+                mySequenceSubscriptions.set(i, initSequence(dataContext, handlers, myBindings.get(i), i, isRebind));
             }
         }
     }
@@ -204,50 +200,42 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
      * Initialises the whole sequence at index outerIdx. Returns the subscription that unsubscribes
      * all elements of the sequence.
      */
-    private Subscription initSequence(D context, Handlers handlers, BindingExtractor<D> bindingExtractor, int outerIdx, boolean isRebind) {
+    private RebindSubscription<ObservableList<Val<String>>> initSequence(D context, Handlers handlers, BindingExtractor<D> bindingExtractor, int outerIdx, boolean isRebind) {
 
         if (!myConstantIndices[outerIdx] && bindingExtractor instanceof ConstantBinding) {
             // then we're initialising for the first time
             myConstantIndices[outerIdx] = true;
-        } else if (myConstantIndices[outerIdx]) {
-            // subscriptions to constants are unimportant anyway
-            return Subscription.EMPTY;
         }
-
-        ObservableList<Val<String>> prevList = myPrevSequences.get(outerIdx); // may be null
 
         // whether rebind or not we have to extract the list from the up-to-date data context
         ObservableList<Val<String>> lst = bindingExtractor.extract(context).filtered(v -> !isIgnorable(v));
-        myPrevSequences.set(outerIdx, lst);
 
         if (!isRebind) {
             // if it's a rebind then those have already been initialized
             myOuterOffsets[outerIdx] = myStringBuffer.length();
             mySequences.set(outerIdx, new ArrayList<>(lst.size()));
+        } else if (mySequenceSubscriptions.get(outerIdx) != null) {
+           return mySequenceSubscriptions.get(outerIdx).rebind(lst);
         }
 
-        return ReactfxUtil.dynamicRecombine(prevList, lst, (prev/*may be null*/, elt, innerIdx) -> initVal(bindingExtractor, handlers, prev, elt, outerIdx, innerIdx));
+        return ReactfxUtil.dynamicRecombine(lst, (elt, innerIdx) -> initVal(handlers, elt, outerIdx, innerIdx));
     }
 
 
     /**
      * Initialises a single Val in a sequence at the given indices.
      */
-    private Subscription initVal(BindingExtractor<D> origin, Handlers handlers, Val<String> previous/*may be null*/, Val<String> stringSource, int outerIdx, int innerIdx) {
+    private RebindSubscription<Val<String>> initVal(Handlers handlers, Val<String> stringSource, int outerIdx, int innerIdx) {
         // sequence bindings will call this method when their content has changed
 
         // this thing is captured which allows its indices to remain up to date
-        ValIdx valIdx = insertBindingAt(outerIdx, innerIdx, previous != null);
+        ValIdx valIdx = insertBindingAt(outerIdx, innerIdx, false);
 
         ReplaceHandler base = (start, end, value) -> handleContentChange(valIdx, handlers, start, end, value);
         final ReplaceHandler relativeToVal = base.withOffset(valIdx::currentAbsoluteOffset);
 
-        return origin.bindSingleVal(myParent,
-                                    previous,
-                                    stringSource,
-                                    valIdx,
-                                    relativeToVal)
-                     .and(() -> deleteBindingAt(valIdx, relativeToVal));
+        return BindingExtractor.bindSingleVal(myParent, stringSource, valIdx, relativeToVal)
+                               .and(() -> deleteBindingAt(valIdx, relativeToVal));
     }
 
 

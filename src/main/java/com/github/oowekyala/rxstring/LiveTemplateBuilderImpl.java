@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
+import org.reactfx.collection.LiveList;
+import org.reactfx.value.Val;
+
 import com.github.oowekyala.rxstring.BindingExtractor.ConstantBinding;
 import javafx.collections.ObservableList;
 
@@ -86,7 +89,7 @@ final class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
 
     @Override
     public <T> LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<? extends T>> extractor, SeqRenderer<? super T> renderer) {
-        myBindings.add(extractor.andThen(lst -> renderer.apply(this, lst))::apply);
+        myBindings.add(extractor.andThen(lst -> renderer.apply(this, LiveList.map(lst, Val::constant)))::apply);
         return this;
     }
 

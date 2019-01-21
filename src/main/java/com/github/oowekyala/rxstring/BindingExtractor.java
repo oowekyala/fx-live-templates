@@ -5,6 +5,8 @@ import org.reactfx.collection.LiveArrayList;
 import org.reactfx.collection.LiveList;
 import org.reactfx.value.Val;
 
+import com.github.oowekyala.rxstring.ReactfxUtil.RebindSubscription;
+
 
 /**
  * Extracts a LiveList[Val[String]] from a data context and binds its values.
@@ -25,34 +27,17 @@ interface BindingExtractor<D> {
      * is just supposed to stop observing the val and not cleanup.
      */
     // on pourrait dispatcher mais ballec
-    default Subscription bindSingleVal(LiveTemplate<?> parent,
-                                       Val<String> previous,
-                                       Val<String> val,
-                                       ValIdx valIdx,
-                                       ReplaceHandler callback) {
+    static RebindSubscription<Val<String>> bindSingleVal(LiveTemplate<?> parent,
+                                                         Val<String> val,
+                                                         ValIdx valIdx,
+                                                         ReplaceHandler callback) {
+
         String initialValue = val.getValue();
+        int prevLength = valIdx.length();
+        callback.replace(0, prevLength, initialValue == null ? "" : initialValue);
 
-        if (previous == null) {
-            // insert it whole
-            callback.replace(0, 0, initialValue == null ? "" : initialValue);
-        }
-
-        Subscription sub = null;
         if (val instanceof LiveTemplateImpl) {
             LiveTemplateImpl<?> subTemplate = (LiveTemplateImpl<?>) val;
-
-            if (previous instanceof LiveTemplateImpl) {
-                // rebind the existing subtemplate
-                LiveTemplateImpl<?> existing = (LiveTemplateImpl<?>) previous;
-
-                existing.importConfigFrom(parent);
-                Subscription handler = existing.addInternalReplaceHandler(callback);
-                Subscription rebindResult = existing.rebind(subTemplate);
-
-                if (rebindResult != null) {
-                    return handler.and(rebindResult);
-                } // else initialise the template anyway
-            }
 
             // initialise a new subtemplate
 
@@ -61,26 +46,57 @@ interface BindingExtractor<D> {
             subTemplate.importConfigFrom(parent);
             // add a replace handler to the bound value of the child
 
-            sub = subTemplate.addInternalReplaceHandler(callback)
-                             .and(() -> {
-                                 subTemplate.dataContextProperty().unbind();
-                                 subTemplate.setDataContext(null);
-                             });
+            subTemplate.addInternalReplaceHandler(callback);
+
+            return templateRebindSub(parent, subTemplate, valIdx, callback);
         } else {
 
-            sub = val.orElseConst("") // so that the values in changes are never null
-                     .changes()
-                     .subscribe(change -> callback.replace(0, change.getOldValue().length(), change.getNewValue()));
+            return valRebindSub(parent, val, valIdx, callback);
         }
+    }
 
-        if (previous != null) {
-            valIdx.signalDontDelete();
+
+    static RebindSubscription<Val<String>> templateRebindSub(LiveTemplate<?> parent,
+                                                             LiveTemplateImpl<?> subTemplate,
+                                                             ValIdx valIdx,
+                                                             ReplaceHandler callback) {
+        return RebindSubscription.make(() -> {
+            subTemplate.dataContextProperty().unbind();
+            subTemplate.setDataContext(null);
+        }, newItem -> {
+
+            if (newItem instanceof LiveTemplateImpl) {
+                // rebind the existing subtemplate
+
+                subTemplate.importConfigFrom(parent);
+                subTemplate.rebind((LiveTemplateImpl<?>) newItem);
+                return templateRebindSub(parent, subTemplate, valIdx, callback);
+            } else {
+                subTemplate.dataContextProperty().unbind();
+                subTemplate.setDataContext(null);
+                return bindSingleVal(parent, newItem, valIdx, callback);
+            }
+        });
+    }
+
+
+    static RebindSubscription<Val<String>> valRebindSub(LiveTemplate<?> parent,
+                                                        Val<String> someVal,
+                                                        ValIdx valIdx,
+                                                        ReplaceHandler callback) {
+        Subscription sub = someVal.orElseConst("") // so that the values in changes are never null
+                                  .changes()
+                                  .subscribe(change -> callback.replace(0, change.getOldValue().length(), change.getNewValue()));
+
+        return RebindSubscription.make(sub, newItem -> {
+            sub.unsubscribe();
+
+            String initialValue = newItem.getValue();
             int prevLength = valIdx.length();
             // replace previous
             callback.replace(0, prevLength, initialValue == null ? "" : initialValue);
-        }
-
-        return sub;
+            return bindSingleVal(parent, newItem, valIdx, callback);
+        });
     }
 
 

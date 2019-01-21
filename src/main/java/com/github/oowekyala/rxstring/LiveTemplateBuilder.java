@@ -8,6 +8,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 
 import org.reactfx.Subscription;
+import org.reactfx.collection.LiveArrayList;
 import org.reactfx.collection.LiveList;
 import org.reactfx.value.Val;
 
@@ -265,7 +266,7 @@ public interface LiveTemplateBuilder<D> {
      * @see #render(Function, ItemRenderer)
      */
     default <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<? extends T>> extractor, ItemRenderer<? super T> renderer) {
-        return bindSeq(extractor.andThen(LiveList::wrapVal)::apply, renderer);
+        return bindSeq(extractor.andThen(obs->new LiveArrayList<>(obs)).andThen(ReactfxUtil::flattenVals)::apply, renderer);
     }
 
 
@@ -348,6 +349,8 @@ public interface LiveTemplateBuilder<D> {
      */
     <T> LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<? extends T>> extractor,
                                        SeqRenderer<? super T> renderer);
+
+
 
 
     /**

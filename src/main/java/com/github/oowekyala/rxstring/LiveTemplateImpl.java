@@ -60,11 +60,14 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
 
 
     @SuppressWarnings("unchecked")
-    Subscription rebind(LiveTemplateImpl<?> other/*non null*/) {
-        BoundLiveTemplate<D> current = myCurBound.getValue();
-        setDataContext((D) other.getDataContext());
+    void rebind(LiveTemplateImpl<?> other/*non null*/) {
+        D newCtx = (D) other.getDataContext();
+        this.dataContextProperty().unbind();
+        this.setDataContext(newCtx);
+//        if (myCurBound.isPresent() && newCtx != null) {
+//            myCurBound.getValue().rebind(newCtx, new Handlers(myUserReplaceHandlers, myInternalReplaceHandlers));
+//        }
         // the bindings of the this template to its current data context are unsubscribed
-        return current::unbind;
     }
 
 

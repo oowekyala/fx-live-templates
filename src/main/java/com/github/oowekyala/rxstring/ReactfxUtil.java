@@ -4,6 +4,7 @@ import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.WeakHashMap;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -11,9 +12,7 @@ import java.util.function.Function;
 import org.reactfx.EventStreams;
 import org.reactfx.RigidObservable;
 import org.reactfx.Subscription;
-import org.reactfx.collection.LiveListBase;
-import org.reactfx.collection.UnmodifiableByDefaultLiveList;
-import org.reactfx.util.TriFunction;
+import org.reactfx.collection.LiveList;
 import org.reactfx.value.Val;
 
 import javafx.beans.value.ObservableValue;
@@ -130,23 +129,21 @@ final class ReactfxUtil {
     }
 
 
-    static <T> Subscription dynamicRecombine(ObservableList<? extends T> prevElems,
-                                             ObservableList<? extends T> elems,
-                                             // prev elt or null, new elt, index -> sub
-                                             TriFunction<? super T, ? super T, Integer, ? extends Subscription> f) {
+    static <T> RebindSubscription<ObservableList<T>> dynamicRecombine(ObservableList<? extends T> elems,
+                                                                      // prev elt or null, new elt, index -> sub
+                                                                      BiFunction<? super T, Integer, ? extends RebindSubscription<T>> f) {
 
-        List<Subscription> elemSubs = new ArrayList<>(elems.size());
+        List<RebindSubscription<T>> elemSubs = new ArrayList<>(elems.size());
 
         for (int i = 0, j = 0; i < elems.size(); i++, j++) {
-            T prev = prevElems != null && j < prevElems.size() ? prevElems.get(j) : null;
-            elemSubs.add(f.apply(prev, elems.get(i), i));
+            elemSubs.add(f.apply(elems.get(i), i));
         }
 
         Subscription lstSub = EventStreams.changesOf(elems).subscribe(ch -> {
             while (ch.next()) {
                 if (ch.wasPermutated()) {
-                    Subscription left = elemSubs.get(ch.getFrom());
-                    Subscription right = elemSubs.set(ch.getTo(), left);
+                    RebindSubscription<T> left = elemSubs.get(ch.getFrom());
+                    RebindSubscription<T> right = elemSubs.set(ch.getTo(), left);
                     elemSubs.set(ch.getFrom(), right);
                 } else {
                     List<? extends T> removed = ch.getRemoved();
@@ -167,13 +164,10 @@ final class ReactfxUtil {
                     for (T added : ch.getAddedSubList()) {
                         T prev = removedIdx < removed.size() ? removed.get(removedIdx) : null;
 
-                        Subscription sub = f.apply(prev, added, i);
                         if (prev != null) {
-                            // set bc it wasn't removed before
-                            // the un-subscription is the responsibility of the subscription maker
-                            elemSubs.set(i, sub);
+                            elemSubs.set(i, elemSubs.get(i).rebind(added));
                         } else {
-                            elemSubs.add(i, sub);
+                            elemSubs.add(i, f.apply(added, i));
                         }
                         i++;
                         removedIdx++;
@@ -182,16 +176,86 @@ final class ReactfxUtil {
             }
         });
 
-        return () -> {
+        return rebindSub(elemSubs, f, lstSub);
+    }
+
+
+    private static <T> RebindSubscription<ObservableList<T>> rebindSub(List<RebindSubscription<T>> elemSubs,
+                                                                       BiFunction<? super T, Integer, ? extends RebindSubscription<T>> f,
+                                                                       Subscription lstSub) {
+        return RebindSubscription.make(() -> {
             lstSub.unsubscribe();
             elemSubs.forEach(Subscription::unsubscribe);
-        };
+        }, newElems -> {
+
+            for (int i = 0; i < newElems.size(); i++) {
+                if (i < elemSubs.size()) {
+                    // this one has a corresponding existing element
+                    elemSubs.set(i, elemSubs.get(i).rebind(newElems.get(i)));
+                } else {
+                    // new element
+                    elemSubs.add(f.apply(newElems.get(i), i));
+                }
+            }
+
+            // those older elements have no corresponding new element
+            // remove them
+            for (int i = newElems.size(); i < elemSubs.size(); i++) {
+                elemSubs.get(i).unsubscribe();
+            }
+
+            return rebindSub(elemSubs, f, lstSub);
+        });
+    }
+
+
+    /**
+     * Creates a new LiveList that reflects the values of the elements of the
+     * given list of observables. If any of the observable values contained in
+     * the source list change, a list change is pushed (lazily). Additions or
+     * removals made to the source collection are also reflected by the returned
+     * list. It kind of behaves like {@code source.map(ObservableValue::getValue)},
+     * except the list is also updated when the individual elements change.
+     *
+     * <p>The returned list is unmodifiable but can be observed.
+     *
+     * @param source List of observables
+     * @param <E>    Type of values of the returned list
+     *
+     * @return A new live list
+     *
+     * @throws NullPointerException If the source collection is null
+     */
+    static <E> LiveList<E> flattenVals(ObservableList<? extends ObservableValue<? extends E>> source) {
+        return new FlatValList<>(Objects.requireNonNull(source));
     }
 
 
     interface RebindSubscription<D> extends Subscription {
 
+        RebindSubscription<D> rebind(D newItem);
 
+
+        @Override
+        default RebindSubscription<D> and(Subscription other) {
+            return make(other.and(this), this::rebind);
+        }
+
+
+        static <D> RebindSubscription<D> make(Subscription unbinder, Function<D, RebindSubscription<D>> rebinder) {
+            return new RebindSubscription<D>() {
+                @Override
+                public RebindSubscription<D> rebind(D newItem) {
+                    return rebinder.apply(newItem);
+                }
+
+
+                @Override
+                public void unsubscribe() {
+                    unbinder.unsubscribe();
+                }
+            };
+        }
     }
 
 }
