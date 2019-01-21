@@ -229,7 +229,7 @@ public interface LiveTemplateBuilder<D> {
      */
     default <T> LiveTemplateBuilder<D> renderTemplate(Function<? super D, ? extends T> extractor,
                                                       Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
-        return render(extractor, ItemRenderer.templated(this, subTemplateBuilder));
+        return render(extractor, ItemRenderer.templated(subTemplateBuilder));
     }
 
 
@@ -311,7 +311,7 @@ public interface LiveTemplateBuilder<D> {
      */
     default <T> LiveTemplateBuilder<D> bindTemplate(Function<? super D, ? extends ObservableValue<? extends T>> extractor,
                                                     Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
-        return bind(extractor, ItemRenderer.templated(this, subTemplateBuilder));
+        return bind(extractor, ItemRenderer.templated(subTemplateBuilder));
     }
 
 
@@ -404,7 +404,7 @@ public interface LiveTemplateBuilder<D> {
      */
     default <T> LiveTemplateBuilder<D> bindTemplatedSeq(Function<D, ? extends ObservableList<? extends T>> extractor,
                                                         Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
-        return bindSeq(extractor, ItemRenderer.templated(this, subTemplateBuilder));
+        return bindSeq(extractor, ItemRenderer.templated(subTemplateBuilder));
     }
 
 

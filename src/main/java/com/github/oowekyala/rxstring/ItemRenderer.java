@@ -61,7 +61,8 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
 
     /**
      * Returns a renderer that surrounds its item with the given prefix and suffix. The given
-     * renderer is used to display the item.
+     * renderer is used to display the item. When the item is absent, the prefix and suffix are absent
+     * too.
      *
      * @param renderer Base renderer
      * @param prefix   Prefix
@@ -71,8 +72,13 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
      * @return A new renderer
      */
     public static <T> ItemRenderer<T> surrounded(ItemRenderer<T> renderer, String prefix, String suffix) {
-        return ItemRenderer.<T>templated(null, b -> b.append(prefix).<T>render(t -> t, renderer).append(suffix));
+        return ItemRenderer.templated(b -> b.append(prefix).render(t -> t, renderer).append(suffix));
     }
+
+    //    TODO
+    //    public static <T> ItemRenderer<T> indented(int indentLevel, ItemRenderer<T> renderer) {
+    //        return new MappedItemRenderer<T>(false, (ctx,t)->ctx.)
+    //    }
 
 
     /**
@@ -84,7 +90,7 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
      * @param <T>          Type of values this renderer can handle
      */
     public static <T> ItemRenderer<T> mappingObservable(Function<? super T, ? extends ObservableValue<String>> fun, boolean ignoreEscape) {
-        return new MappedItemRenderer<T>(ignoreEscape, fun.andThen(Val::wrap));
+        return new MappedItemRenderer<>(ignoreEscape, fun.andThen(Val::wrap));
     }
 
 
@@ -92,16 +98,14 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
      * A value renderer that renders Ts using a nested live template. This is what {@link LiveTemplateBuilder#bindTemplatedSeq(Function, Consumer)}
      * and {@link LiveTemplateBuilder#bindTemplate(Function, Consumer)} use under the hood.
      *
-     * @param parent             Parent builder, which copies its local configuration (like default indent,
-     *                           but not its bindings) to the child
      * @param subTemplateBuilder A function side-effecting on the builder of the sub-template
      *                           to configure it
      * @param <T>                Type of values to render
      *
      * @return A value renderer for Ts
      */
-    static <T> ItemRenderer<T> templated(LiveTemplateBuilder<?> parent, Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
-        return new TemplatedItemRenderer<T>(parent, subTemplateBuilder);
+    public static <T> ItemRenderer<T> templated(Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
+        return new TemplatedItemRenderer<>(subTemplateBuilder);
     }
 
 
@@ -144,9 +148,8 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
         private LiveTemplateBuilder<T> subTemplateBuilder;
 
 
-        TemplatedItemRenderer(LiveTemplateBuilder<?> parent, Consumer<LiveTemplateBuilder<T>> subtemplateBuilder) {
+        TemplatedItemRenderer(Consumer<LiveTemplateBuilder<T>> subtemplateBuilder) {
             this.subTemplateBuilderSpec = subtemplateBuilder;
-
         }
 
 
