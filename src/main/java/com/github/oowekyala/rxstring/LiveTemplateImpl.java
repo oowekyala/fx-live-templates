@@ -38,7 +38,7 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
         myDataContext.values().subscribe(newCtx -> {
 
             if (myCurBound.isPresent() && newCtx != null) {
-                myCurBound.getValue().rebind(newCtx, new Handlers(myUserReplaceHandlers, myInternalReplaceHandlers));
+                myCurBound.getValue().rebind(newCtx);
             } else if (newCtx != null) {
                 myCurBound.setValue(new BoundLiveTemplate<>(newCtx, this, dataBinder, myUserReplaceHandlers, myInternalReplaceHandlers));
             } else {

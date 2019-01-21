@@ -89,7 +89,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         this.myStringBuffer = new StringBuffer();
         this.myReplaceHandlers = new Handlers(userReplaceHandler, internalReplaceHandlers);
 
-        bindTo(dataContext, myReplaceHandlers, false);
+        bindTo(dataContext, false);
         this.isPushInvalidations = true;
 
         myReplaceHandlers.notifyListenersOfReplace(ReplacementStrategy.replacing(0, 0, myStringBuffer.toString()));
@@ -115,16 +115,16 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     }
 
 
-    void rebind(D dataContext, Handlers handlers) {
-        bindTo(dataContext, handlers, true);
+    void rebind(D dataContext) {
+        bindTo(dataContext, true);
     }
 
 
-    private void bindTo(D dataContext, Handlers handlers, boolean isRebind) {
+    private void bindTo(D dataContext, boolean isRebind) {
         for (int i = 0; i < myOuterOffsets.length; i++) {
             // only reevaluate the thing if it's not constant
             if (!myConstantIndices[i]) {
-                mySequenceSubscriptions.set(i, initSequence(dataContext, handlers, myBindings.get(i), i, isRebind));
+                mySequenceSubscriptions.set(i, initSequence(dataContext, myBindings.get(i), i, isRebind));
             }
         }
     }
@@ -172,7 +172,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     }
 
 
-    private void handleContentChange(ValIdx valIdx, Handlers handlersHolder, int start, int end, String value) {
+    private void handleContentChange(ValIdx valIdx, int start, int end, String value) {
         if (start == end && value.isEmpty()) {
             // don't fire an event for nothing
             return;
@@ -182,13 +182,13 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
         replacementStrategy.apply(myStringBuffer::replace, false);
 
-        valIdx.propagateOffsetShift(value.length() - (end - start));
 
         if (isPushInvalidations) {
             // propagate the change to the templates that contain this one
-            handlersHolder.notifyListenersOfReplace(replacementStrategy);
+            myReplaceHandlers.notifyListenersOfReplace(replacementStrategy);
             myInvalidations.push(null);
         }
+        valIdx.propagateOffsetShift(value.length() - (end - start));
     }
 
 
@@ -201,7 +201,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
      * Initialises the whole sequence at index outerIdx. Returns the subscription that unsubscribes
      * all elements of the sequence.
      */
-    private RebindSubscription<ObservableList<Val<String>>> initSequence(D context, Handlers handlers, BindingExtractor<D> bindingExtractor, int outerIdx, boolean isRebind) {
+    private RebindSubscription<ObservableList<Val<String>>> initSequence(D context, BindingExtractor<D> bindingExtractor, int outerIdx, boolean isRebind) {
 
         if (!myConstantIndices[outerIdx] && bindingExtractor instanceof ConstantBinding) {
             // then we're initialising for the first time
@@ -219,20 +219,20 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
             return mySequenceSubscriptions.get(outerIdx).rebind(lst);
         }
 
-        return ReactfxUtil.dynamicRecombine(lst, (elt, innerIdx) -> initVal(handlers, elt, outerIdx, innerIdx));
+        return ReactfxUtil.dynamicRecombine(lst, (elt, innerIdx) -> initVal(elt, outerIdx, innerIdx));
     }
 
 
     /**
      * Initialises a single Val in a sequence at the given indices.
      */
-    private RebindSubscription<Val<String>> initVal(Handlers handlers, Val<String> stringSource, int outerIdx, int innerIdx) {
+    private RebindSubscription<Val<String>> initVal(Val<String> stringSource, int outerIdx, int innerIdx) {
         // sequence bindings will call this method when their content has changed
 
         // this thing is captured which allows its indices to remain up to date
         ValIdx valIdx = insertBindingAt(outerIdx, innerIdx);
 
-        ReplaceHandler base = (start, end, value) -> handleContentChange(valIdx, handlers, start, end, value);
+        ReplaceHandler base = (start, end, value) -> handleContentChange(valIdx, start, end, value);
         final ReplaceHandler relativeToVal = base.withOffset(valIdx::currentAbsoluteOffset);
 
         return BindingExtractor.bindSingleVal(myParent, stringSource, valIdx, relativeToVal)
