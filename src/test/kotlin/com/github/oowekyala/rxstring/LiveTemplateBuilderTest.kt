@@ -229,7 +229,7 @@ class LiveTemplateBuilderTest : FunSpec({
 
         val lt =
                 LiveTemplate.newBuilder<DContext>()
-                        .append("<top nums='").bindSeq({ it.nums }, SeqRenderer.delimited(asString(), "[", "]", ",")).append("'/>")
+                        .append("<top nums='").bindSeq({ it.nums }, SeqRenderer.delimited("[", "]", ",", asString())).append("'/>")
                         .toBoundTemplate(DContext())
 
         lt.value shouldBe """
@@ -300,7 +300,7 @@ class LiveTemplateBuilderTest : FunSpec({
 
         val lt =
                 LiveTemplate.newBuilder<DContext>()
-                        .append("<top nums='").bindSeq({ it.nums }, SeqRenderer.delimited(asString(), "", "", ",")).append("'/>")
+                        .append("<top nums='").bindSeq({ it.nums }, SeqRenderer.delimited("", "", ",", asString())).append("'/>")
                         .toBoundTemplate(DContext())
 
         (lt as LiveTemplateImpl).totalSubscriptions().value shouldBe 5L
@@ -319,7 +319,7 @@ class LiveTemplateBuilderTest : FunSpec({
 
         val lt =
                 LiveTemplate.newBuilder<DContext>()
-                        .append("<top ").bind({ it.name }, surrounded(asString(), "name='", "'")).append("/>")
+                        .append("<top ").bind({ it.name }, surrounded("name='", "'", asString())).append("/>")
                         .toBoundTemplate(DContext(), recordEvents(events))
 
 
@@ -358,7 +358,7 @@ class LiveTemplateBuilderTest : FunSpec({
         val lt = LiveTemplate
                 .newBuilder<DContext>().withDefaultIndent("* ")
                 .appendIndent(1).append("<top>").endLine()
-                .bind({ it.name }, indented(2, surrounded(asString(), "<name>", "</name>\n")))
+                .bind({ it.name }, indented(2, surrounded("<name>", "</name>\n", asString())))
                 .appendIndent(1).append("</top>")
                 .toTemplate()
 

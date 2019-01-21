@@ -51,15 +51,15 @@ public class SeqRenderer<T> implements BiFunction<LiveTemplateBuilder<?>, Observ
      * and adds delimiters and a prefix and suffix. If the sequence is empty, only the prefix
      * and suffix are shown.
      *
-     * @param itemRenderer Renderer for elements
+     * @param <T>          Type of items
      * @param prefix       Prefix
      * @param suffix       Suffix
      * @param delim        Delimiter
-     * @param <T>          Type of items
+     * @param itemRenderer Renderer for elements
      *
      * @return A delimited seq renderer
      */
-    public static <T> SeqRenderer<T> delimited(ItemRenderer<T> itemRenderer, String prefix, String suffix, String delim) {
+    public static <T> SeqRenderer<T> delimited(String prefix, String suffix, String delim, ItemRenderer<T> itemRenderer) {
         return forItems(itemRenderer).delimited(prefix, suffix, delim);
     }
 

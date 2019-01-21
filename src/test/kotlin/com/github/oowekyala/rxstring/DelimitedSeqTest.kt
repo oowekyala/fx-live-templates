@@ -17,7 +17,7 @@ class DelimitedSeqTest : FunSpec() {
         val nums: ObservableList<Int> = FXCollections.observableArrayList(ns)
     }
 
-    var lt = LiveTemplate.newBuilder<DContext>().bindSeq({ it.nums }, delimited(asString(), "[", "]", ","))
+    var lt = LiveTemplate.newBuilder<DContext>().bindSeq({ it.nums }, delimited("[", "]", ",", asString()))
 
     init {
         var i = 0

@@ -10,7 +10,11 @@ import javafx.beans.value.ObservableValue;
 
 
 /**
- * A type used to render objects of type T in a template.
+ * A type used to render objects of type T in a template. Item renderers can use
+ * the local configuration of the {@link LiveTemplateBuilder} that invokes them,
+ * e.g. to get the local indentation style. They can be composed to obtain new
+ * renderers, see e.g. {@link #surrounded(String, String, ItemRenderer)} or
+ * {@link #indented(int, ItemRenderer)}.
  *
  * @param <T> Type of values to map
  */
@@ -30,7 +34,7 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
      *
      * @return A new renderer
      */
-    public abstract ItemRenderer<T> escapeWith(Function<String, String> escapeFun);
+    abstract ItemRenderer<T> escapeWith(Function<String, String> escapeFun);
 
 
     /**
@@ -61,18 +65,31 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
      * renderer is used to display the item. When the item is absent, the prefix and suffix are absent
      * too.
      *
-     * @param renderer Base renderer
+     * @param <T>      Type of items to render
      * @param prefix   Prefix
      * @param suffix   Suffix
-     * @param <T>      Type of items to render
+     * @param renderer Base renderer
      *
      * @return A new renderer
      */
-    public static <T> ItemRenderer<T> surrounded(ItemRenderer<T> renderer, String prefix, String suffix) {
+    public static <T> ItemRenderer<T> surrounded(String prefix, String suffix, ItemRenderer<T> renderer) {
         return templated(b -> b.append(prefix).render(Function.identity(), renderer).append(suffix));
     }
 
 
+    /**
+     * Returns a renderer that prepends the {@linkplain LiveTemplateBuilder#withDefaultIndent(String) indentation}
+     * currently defined by the template builder to the rendering of the given item. This can be
+     * useful if the indentation should only be displayed when the bound value is not-null. Using
+     * {@link LiveTemplateBuilder#appendIndent(int)} appends it as a string constant and it will
+     * always be displayed.
+     *
+     * @param indentLevel Number of times to repeat the indentation
+     * @param renderer    Base renderer
+     * @param <T>         Type of item to render
+     *
+     * @return A new renderer
+     */
     public static <T> ItemRenderer<T> indented(int indentLevel, ItemRenderer<T> renderer) {
         return templated(b -> b.appendIndent(indentLevel).render(Function.identity(), renderer));
     }
@@ -93,7 +110,8 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
 
     /**
      * A value renderer that renders Ts using a nested live template. This is what {@link LiveTemplateBuilder#bindTemplatedSeq(Function, Consumer)}
-     * and {@link LiveTemplateBuilder#bindTemplate(Function, Consumer)} use under the hood.
+     * and {@link LiveTemplateBuilder#bindTemplate(Function, Consumer)} use under the hood. This method
+     * allows you to combine it with other renderers, e.g. {@link #surrounded(String, String, ItemRenderer)}.
      *
      * @param subTemplateBuilder A function side-effecting on the builder of the sub-template
      *                           to configure it

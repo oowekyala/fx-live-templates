@@ -19,34 +19,35 @@ import javafx.util.Callback;
 /**
  * Builds a {@link LiveTemplate} with a fluent API.
  *
- *
  * <p>A template can have the following structural elements:
  * <ul>
- * <li>String constants: those are independent of the data context. See
- * {@link #append(String)}, {@link #appendLine(String)}, {@link #appendIndent(int)}.</li>
- * <li>{@link #render(Function, ItemRenderer) Constant bindings}: those will be
- * extracted from the data context at the time the template is bound, but are not
- * observable values themselves, so will only be rendered once.</li>
+ * <li>{@link #append(String) String constants}: those are independent from the data context and will always be rendered.
+ * The relevant methods are prefixed with "append".</li>
  * <li>Observable bindings: those are observable properties extracted from the data context
- * at the time the template is bound. Each time a property of the data context
- * changes value, the template updates its string value and calls its {@linkplain LiveTemplate#addReplaceHandler(ReplaceHandler) replace handlers}.
- * At the time of construction though, those are specified by an extraction
- * function, and a {@linkplain ItemRenderer rendering function}. Some rendering
- * functions are remarkable:
+ * at the time the template is bound. The string representation will be updated
+ * each time the property changes value. At the time of construction though, those
+ * are specified by an extraction function, and a {@linkplain ItemRenderer rendering function}.
+ * Some rendering functions are remarkable:
  * <ul>
- * <li>{@linkplain #bind(Function, ItemRenderer) String rendering}: the value of the property
+ * <li>{@linkplain #bind(Function, Function) String rendering}: the value of the property
  * is just converted to a string.</li>
  * <li>{@linkplain #bindTemplate(Function, Consumer) Subtemplate rendering}: the
- * value of the property is bound to the datacontext of a sub-template. </li>
+ * value of the property is bound to the data context of a sub-template.</li>
  * <li>{@linkplain #bindSeq(Function) Sequence rendering}: if a property is an
  * {@link ObservableList}, then changes to its individual components can be rendered
- * independently. The individual components can be rendered using any rendering method.
+ * independently. The individual components can be rendered using any rendering method,
+ * including as {@linkplain #bindTemplatedSeq(Function, Consumer) subtemplates}.
  * </li>
  * </ul>
+ * Other kinds of rendering are supported through {@link ItemRenderer}s, see {@link #bind(Function, ItemRenderer)}.
  * </li>
+ * <li>{@link #render(Function, ItemRenderer) Constant bindings}: those will be
+ * extracted from the data context at the time the template is bound, but are not
+ * observable values themselves, so will only be rendered once. They use {@link ItemRenderer}s
+ * for rendering too. The relevant methods are prefixed with "render"</li>
  * </ul>
  *
- * Builders own a small set of configuration properties that are ignored by the templates they build,
+ * <p>Builders own a small set of configuration properties that are ignored by the templates they build,
  * but allow using shorthands during the construction process. These are
  * <ul>
  * <li>{@linkplain #withDefaultIndent(String) the default indentation}</li>
@@ -113,12 +114,15 @@ public interface LiveTemplateBuilder<D> {
 
     /**
      * Appends a string constant to the rest of the builder.
+     * String constants are always rendered, and never {@link #withDefaultEscape(Function) escaped}.
      *
      * @param string String to append
      *
      * @return This builder
      *
      * @throws NullPointerException if the string is null
+     * @see #appendIndent(int)
+     * @see #appendLine(String)
      */
     LiveTemplateBuilder<D> append(String string);
 
@@ -127,6 +131,9 @@ public interface LiveTemplateBuilder<D> {
      * Appends a single newline (\n) to the currently built template.
      *
      * @return This builder
+     *
+     * @see #appendLine(String)
+     * @see #append(String)
      */
     default LiveTemplateBuilder<D> endLine() {
         return append("\n");
@@ -141,6 +148,8 @@ public interface LiveTemplateBuilder<D> {
      * @return This builder
      *
      * @throws NullPointerException if the string is null
+     * @see #endLine()
+     * @see #append(String)
      */
     default LiveTemplateBuilder<D> appendLine(String line) {
         return append(line).endLine();
@@ -235,7 +244,7 @@ public interface LiveTemplateBuilder<D> {
 
     /**
      * Binds a property of the data context to be rendered with {@link Object#toString()}.
-     * If the object is null, value has a null value, the empty string will be used.
+     * If the property has a null value, the empty string will be used.
      *
      * @param extractor Extracts the observable value to render from the data context
      * @param <T>       Type of values to render
@@ -251,8 +260,8 @@ public interface LiveTemplateBuilder<D> {
 
     /**
      * Binds a property of the data context to be rendered with the given string conversion
-     * function. If the conversion function returns null, then the empty string will be used
-     * instead.
+     * function. When the property has a null value, or if the conversion function returns null,
+     * the empty string will be rendered instead.
      *
      * @param extractor Extracts the observable value to render from the data context
      * @param renderer  An object specifying how the value should be converted to a string
@@ -354,13 +363,15 @@ public interface LiveTemplateBuilder<D> {
      * Binds a property of the data context that returns an observable list of items.
      * Each item will be mapped to a string using the specified {@link ItemRenderer}.
      * To have a delimited list, use {@link #bindSeq(Function, SeqRenderer)} with
-     * {@link SeqRenderer#delimited(ItemRenderer, String, String, String)}.
+     * {@link SeqRenderer#delimited(String, String, String, ItemRenderer)}.
      *
      * @param <T>       Type of items of the list
      * @param extractor List extractor
      * @param renderer  Renderer function for items
      *
      * @return This builder
+     *
+     * @see #bindSeq(Function, SeqRenderer)
      */
     default <T> LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<? extends T>> extractor,
                                                ItemRenderer<? super T> renderer) {
@@ -380,6 +391,7 @@ public interface LiveTemplateBuilder<D> {
      * @return This builder
      *
      * @see #bindSeq(Function, ItemRenderer)
+     * @see #bindSeq(Function, SeqRenderer)
      */
     default <T> LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<? extends T>> extractor,
                                                Function<? super T, String> renderer) {
@@ -401,6 +413,7 @@ public interface LiveTemplateBuilder<D> {
      * @return This builder
      *
      * @see #bindTemplate(Function, Consumer)
+     * @see #bindSeq(Function, SeqRenderer)
      */
     default <T> LiveTemplateBuilder<D> bindTemplatedSeq(Function<D, ? extends ObservableList<? extends T>> extractor,
                                                         Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
@@ -414,6 +427,8 @@ public interface LiveTemplateBuilder<D> {
      * @param extractor Value extractor
      *
      * @return This builder
+     *
+     * @see #bindSeq(Function, SeqRenderer)
      */
     default LiveTemplateBuilder<D> bindSeq(Function<D, ? extends ObservableList<?>> extractor) {
         return bindSeq(extractor, ItemRenderer.asString());
