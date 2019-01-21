@@ -41,6 +41,12 @@ final class ReactfxUtil {
     }
 
 
+    public static <T, R> Val<R> flatMapPreserveConst(ObservableValue<T> val,
+                                                     Function<? super T, ? extends ObservableValue<R>> f) {
+        return isConst(val) ? Val.constant(f.apply(val.getValue()).getValue()) : Val.flatMap(val,f);
+    }
+
+
     /**
      * A mapped view that remembers already computed elements. The function
      * should be pure.

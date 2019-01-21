@@ -106,11 +106,12 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
 
     void unbind() {
-        // notify everyone that the template was deleted but only once
-        myReplaceHandlers.notifyListenersOfReplace(ReplacementStrategy.replacing(0, myStringBuffer.length(), ""));
 
         isPushInvalidations = false; // avoid pushing every intermediary state as a value
         mySequenceSubscriptions.forEach(Subscription::unsubscribe);
+        // notify everyone that the template was deleted but only once
+        myReplaceHandlers.notifyListenersOfReplace(ReplacementStrategy.replacing(0, myStringBuffer.length(), ""));
+
     }
 
 
@@ -215,7 +216,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
             myOuterOffsets[outerIdx] = myStringBuffer.length();
             mySequences.set(outerIdx, new ArrayList<>(lst.size()));
         } else if (mySequenceSubscriptions.get(outerIdx) != null) {
-           return mySequenceSubscriptions.get(outerIdx).rebind(lst);
+            return mySequenceSubscriptions.get(outerIdx).rebind(lst);
         }
 
         return ReactfxUtil.dynamicRecombine(lst, (elt, innerIdx) -> initVal(handlers, elt, outerIdx, innerIdx));
@@ -229,7 +230,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         // sequence bindings will call this method when their content has changed
 
         // this thing is captured which allows its indices to remain up to date
-        ValIdx valIdx = insertBindingAt(outerIdx, innerIdx, false);
+        ValIdx valIdx = insertBindingAt(outerIdx, innerIdx);
 
         ReplaceHandler base = (start, end, value) -> handleContentChange(valIdx, handlers, start, end, value);
         final ReplaceHandler relativeToVal = base.withOffset(valIdx::currentAbsoluteOffset);
@@ -240,19 +241,13 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
 
     private void deleteBindingAt(ValIdx idx, ReplaceHandler replaceHandler) {
-        idx.delete(replaceHandler);
+        if (isPushInvalidations) {
+            idx.delete(replaceHandler);
+        }
     }
 
 
-    private ValIdx insertBindingAt(int outerIdx, int innerIdx, boolean overwrite) {
-        if (overwrite) {
-            List<ValIdx> seq = mySequences.get(outerIdx);
-            if (innerIdx < seq.size()) {
-                // gets the existing binding
-                return seq.get(innerIdx);
-            }
-        }
-
+    private ValIdx insertBindingAt(int outerIdx, int innerIdx) {
         return new ValIdx(myOuterOffsets, myStringBuffer, outerIdx, innerIdx, mySequences.get(outerIdx));
     }
 
