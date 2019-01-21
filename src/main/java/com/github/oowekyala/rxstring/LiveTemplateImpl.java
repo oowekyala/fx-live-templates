@@ -26,7 +26,7 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
     private final Val<String> myDelegateStringVal;
 
     // Those are shared with all the bound templates this instance generates
-    private final List<ReplaceHandler> myInternalReplaceHandlers = new ArrayList<>();
+    private final Var<ReplaceHandler> myInternalReplaceHandlers = Var.newSimpleVar(null);
     private final List<ReplaceHandler> myUserReplaceHandlers = new ArrayList<>();
     private final Var<Boolean> useDiffMatchPatch = Var.newSimpleVar(true);
 
@@ -50,9 +50,8 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
 
 
     Subscription addInternalReplaceHandler(ReplaceHandler handler) {
-        myInternalReplaceHandlers.clear();
-        myInternalReplaceHandlers.add(handler);
-        return Subscription.EMPTY;
+        myInternalReplaceHandlers.setValue(handler);
+        return Subscription.EMPTY;//FIXME
         //                return () -> myInternalReplaceHandlers.remove(handler);
     }
 

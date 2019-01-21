@@ -72,13 +72,13 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
      * @return A new renderer
      */
     public static <T> ItemRenderer<T> surrounded(ItemRenderer<T> renderer, String prefix, String suffix) {
-        return ItemRenderer.templated(b -> b.append(prefix).render(t -> t, renderer).append(suffix));
+        return templated(b -> b.append(prefix).render(Function.identity(), renderer).append(suffix));
     }
 
-    //    TODO
-    //    public static <T> ItemRenderer<T> indented(int indentLevel, ItemRenderer<T> renderer) {
-    //        return new MappedItemRenderer<T>(false, (ctx,t)->ctx.)
-    //    }
+
+    public static <T> ItemRenderer<T> indented(int indentLevel, ItemRenderer<T> renderer) {
+        return templated(b -> b.appendIndent(indentLevel).render(Function.identity(), renderer));
+    }
 
 
     /**

@@ -13,6 +13,7 @@ import org.reactfx.EventSource;
 import org.reactfx.Subscription;
 import org.reactfx.value.Val;
 import org.reactfx.value.ValBase;
+import org.reactfx.value.Var;
 
 import com.github.oowekyala.rxstring.ReactfxUtil.RebindSubscription;
 import com.github.oowekyala.rxstring.diff_match_patch.Patch;
@@ -72,7 +73,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
                       LiveTemplate<D> parent,
                       List<BindingExtractor<D>> bindings,
                       List<ReplaceHandler> userReplaceHandler,
-                      List<ReplaceHandler> internalReplaceHandlers) {
+                      Var<ReplaceHandler> parentReplaceCallback) {
 
         Objects.requireNonNull(dataContext);
 
@@ -86,7 +87,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         this.myBindings = bindings;
 
         this.myStringBuffer = new StringBuffer();
-        this.myReplaceHandlers = new Handlers(userReplaceHandler, internalReplaceHandlers);
+        this.myReplaceHandlers = new Handlers(userReplaceHandler, parentReplaceCallback);
 
         bindTo(dataContext, false);
         this.isPushInvalidations = true;
@@ -105,11 +106,12 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
 
     void unbind() {
-
+        // save the length, because unsubscribing will change it
+        int myLength = myStringBuffer.length();
         isPushInvalidations = false; // avoid pushing every intermediary state as a value
         mySequenceSubscriptions.forEach(Subscription::unsubscribe);
         // notify everyone that the template was deleted but only once
-        myReplaceHandlers.notifyListenersOfReplace(ReplacementStrategy.replacing(0, myStringBuffer.length(), ""));
+        myReplaceHandlers.notifyListenersOfReplace(ReplacementStrategy.replacing(0, myLength, ""));
 
     }
 
@@ -213,6 +215,8 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
             myOuterOffsets[outerIdx] = myStringBuffer.length();
             mySequences.set(outerIdx, new ArrayList<>(lst.size()));
         } else if (mySequenceSubscriptions.get(outerIdx) != null) {
+            // then we're rebinding, and so we'll rebase the new list onto the current one
+            // to merge existing templates
             return mySequenceSubscriptions.get(outerIdx).rebind(lst);
         }
 
@@ -262,13 +266,13 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     private static class Handlers {
 
         private final List<ReplaceHandler> myUserHandler;
-        private final List<ReplaceHandler> myInternalReplaceHandlers;
+        private final Var<ReplaceHandler> myParentCallback;
 
 
         Handlers(List<ReplaceHandler> myUserHandler,
-                 List<ReplaceHandler> myInternalReplaceHandlers) {
+                 Var<ReplaceHandler> myInternalReplaceHandlers) {
             this.myUserHandler = myUserHandler;
-            this.myInternalReplaceHandlers = myInternalReplaceHandlers;
+            this.myParentCallback = myInternalReplaceHandlers;
         }
 
 
@@ -279,8 +283,10 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
          * and {@link ReplacementStrategy#replacing(int, int, String)}.
          */
         private void notifyListenersOfReplace(ReplacementStrategy strategy) {
-            myInternalReplaceHandlers.forEach(h -> strategy.apply(h, false));
-            myUserHandler.forEach(h -> strategy.apply(h, true));
+            myParentCallback.ifPresent(h -> strategy.apply(h, false));
+            if (myParentCallback.isEmpty()) {
+                myUserHandler.forEach(h -> strategy.apply(h, true));
+            }
         }
 
     }

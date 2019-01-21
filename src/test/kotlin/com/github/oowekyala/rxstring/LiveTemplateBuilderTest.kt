@@ -1,5 +1,6 @@
 package com.github.oowekyala.rxstring
 
+import com.github.oowekyala.rxstring.ItemRenderer.*
 import io.kotlintest.shouldBe
 import io.kotlintest.specs.FunSpec
 import javafx.collections.FXCollections
@@ -228,7 +229,7 @@ class LiveTemplateBuilderTest : FunSpec({
 
         val lt =
                 LiveTemplate.newBuilder<DContext>()
-                        .append("<top nums='").bindSeq({ it.nums }, SeqRenderer.delimited(ItemRenderer.asString(), "[", "]", ",")).append("'/>")
+                        .append("<top nums='").bindSeq({ it.nums }, SeqRenderer.delimited(asString(), "[", "]", ",")).append("'/>")
                         .toBoundTemplate(DContext())
 
         lt.value shouldBe """
@@ -299,7 +300,7 @@ class LiveTemplateBuilderTest : FunSpec({
 
         val lt =
                 LiveTemplate.newBuilder<DContext>()
-                        .append("<top nums='").bindSeq({ it.nums }, SeqRenderer.delimited(ItemRenderer.asString(), "", "", ",")).append("'/>")
+                        .append("<top nums='").bindSeq({ it.nums }, SeqRenderer.delimited(asString(), "", "", ",")).append("'/>")
                         .toBoundTemplate(DContext())
 
         (lt as LiveTemplateImpl).totalSubscriptions().value shouldBe 5L
@@ -334,7 +335,7 @@ class LiveTemplateBuilderTest : FunSpec({
 
         val lt =
                 LiveTemplate.newBuilder<DContext>()
-                        .append("<top ").bind({ it.name }, ItemRenderer.surrounded(ItemRenderer.asString(), "name='", "'")).append("/>")
+                        .append("<top ").bind({ it.name }, surrounded(asString(), "name='", "'")).append("/>")
                         .toBoundTemplate(DContext(), recordEvents(events))
 
 
@@ -356,6 +357,47 @@ class LiveTemplateBuilderTest : FunSpec({
         lt.value shouldBe """
             <top />
         """.trimIndent()
+    }
+
+    test("Test indented renderer inheritance") {
+
+        class SubDContext {
+            val name = Var.newSimpleVar("sub")
+            val num = Var.newSimpleVar(4)
+        }
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+            val sub = Var.newSimpleVar(SubDContext())
+        }
+
+        val lt = LiveTemplate
+                .newBuilder<DContext>().withDefaultIndent("* ")
+                .appendIndent(1).append("<top>").endLine()
+                .bind({ it.name }, indented(2, surrounded(asString(), "<name>", "</name>\n")))
+                .appendIndent(1).append("</top>")
+                .toTemplate()
+
+        val extSb = StringBuilder()
+
+        val handler = ReplaceHandler { start, end, value -> extSb.replace(start, end, value) }
+        lt.addReplaceHandler(handler)
+        lt.value shouldBe null
+
+        val dc = DContext()
+        lt.dataContext = dc
+        lt.value shouldBe """
+            * <top>
+            * * <name>top</name>
+            * </top>
+        """.trimIndent()
+
+        lt.dataContext.name.value = null
+        lt.value shouldBe """
+            * <top>
+            * </top>
+        """.trimIndent()
+
     }
 
 })
