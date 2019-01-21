@@ -1,5 +1,7 @@
 package com.github.oowekyala.rxstring;
 
+import static java.lang.Character.isWhitespace;
+
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -56,7 +58,7 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
      * @param <T> Type of values this renderer can handle
      */
     public static <T> ItemRenderer<T> asString(Function<? super T, String> f) {
-        return new MappedItemRenderer<>(false, f.andThen(Val::constant));
+        return MappedItemRenderer.mapping(false, f.andThen(Val::constant));
     }
 
 
@@ -64,12 +66,12 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
      * A value renderer that maps Ts to an observable string using the provided asString.
      * This is the most general way to create a value renderer.
      *
-     * @param fun          Mapper from T to String
-     * @param ignoreEscape If true, the value of this renderer won't be escaped by {@link LiveTemplateBuilder#withDefaultEscape(Function)}.
      * @param <T>          Type of values this renderer can handle
+     * @param ignoreEscape If true, the value of this renderer won't be escaped by {@link LiveTemplateBuilder#withDefaultEscape(Function)}.
+     * @param fun          Mapper from T to String
      */
-    public static <T> ItemRenderer<T> mappingObservable(Function<? super T, ? extends ObservableValue<String>> fun, boolean ignoreEscape) {
-        return new MappedItemRenderer<>(ignoreEscape, fun.andThen(Val::wrap));
+    public static <T> ItemRenderer<T> mappingObservable(boolean ignoreEscape, Function<? super T, ? extends ObservableValue<String>> fun) {
+        return MappedItemRenderer.mapping(ignoreEscape, fun.andThen(Val::wrap));
     }
 
 
@@ -125,6 +127,57 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
 
 
     /**
+     * A value renderer that wraps the output of the given renderer to the specified text width.
+     * Doing this over a template will break the minimal change calculation. This includes the
+     * {@link #surrounded(String, String, ItemRenderer)} and {@link #indented(int, ItemRenderer)}
+     * renderers because they're implemented as light subtemplates.
+     *
+     * @param wrapWidth     Max width of the text
+     * @param preserveWords Whether to avoid cutting through words
+     * @param wrapped       Renderer that's supposed to wrap the text
+     * @param <T>           Type of values to render
+     *
+     * @return A value renderer for Ts
+     */
+    public static <T> ItemRenderer<T> wrapped(int wrapWidth, boolean preserveWords, ItemRenderer<T> wrapped) {
+        return new MappedItemRenderer<>(false, (ctx, t) -> Val.map(wrapped.apply(ctx, t), s -> wrapToWidth(s, wrapWidth, preserveWords)));
+    }
+
+
+    private static String wrapToWidth(String toWrap, int width, boolean preserveWords) {
+        if (toWrap.length() < width) {
+            return toWrap;
+        }
+
+        StringBuilder builder = new StringBuilder(toWrap);
+        int offset = width;
+        while (offset < toWrap.length()) {
+            while (preserveWords && offset < toWrap.length() && !isWhitespace(builder.charAt(offset))) {
+                offset++;
+            }
+
+            int cut = offset;
+
+            while (preserveWords && offset < toWrap.length() && isWhitespace(builder.charAt(offset))) {
+                offset++;
+            }
+
+            int wsEnd = offset;
+            if (offset >= toWrap.length()) {
+                break; // text ends in ws
+            }
+            builder.insert(cut, "\n");
+            if (wsEnd - cut > 0) {
+                builder.replace(cut + 1, wsEnd + 1, "");
+            }
+            offset = wsEnd + 1 + width;
+        }
+
+        return builder.toString();
+    }
+
+
+    /**
      * Produces a templated render composed with a base renderer and some additional specs. If the
      * base renderer is also a templated renderer, its spec is merged with the others so that nesting
      * is avoided. E.g. {@code indented(1, surrounded("[", "]", templated(b->b.append("f")))} produces a single
@@ -146,33 +199,38 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
 
 
     private static class MappedItemRenderer<T> extends ItemRenderer<T> {
-        private final BiFunction<? super LiveTemplateBuilder<?>, ? super T, ? extends Val<String>> myFun;
+        private final BiFunction<? super LiveTemplateBuilder<?>, ? super ObservableValue<? extends T>, ? extends Val<String>> myFun;
 
         private final boolean myNoEscape;
 
 
         /** Most general constructor. */
-        private MappedItemRenderer(boolean ignoreEscape,
-                                   BiFunction<? super LiveTemplateBuilder<?>, ? super T, ? extends Val<String>> myFun) {
+        private MappedItemRenderer(boolean ignoreEscape, BiFunction<? super LiveTemplateBuilder<?>, ? super ObservableValue<? extends T>, ? extends Val<String>> myFun) {
             this.myNoEscape = ignoreEscape;
             this.myFun = myFun;
         }
 
-
-        /** Constructor for a renderer that doesn't use the builder config. */
-        private MappedItemRenderer(boolean ignoreEscape, Function<? super T, ? extends Val<String>> fun) {
-            this(ignoreEscape, (ctx, t) -> fun.apply(t));
-        }
+        // Constructors for renderers that don't use the builder config.
 
 
         @Override
         public Val<String> apply(LiveTemplateBuilder<?> liveTemplateBuilder, ObservableValue<? extends T> tObs) {
-            return Val.flatMap(tObs, t -> myFun.apply(liveTemplateBuilder, t));
+            return myFun.apply(liveTemplateBuilder, tObs);
         }
 
 
         public ItemRenderer<T> escapeWith(Function<String, String> escapeFun) {
             return myNoEscape ? this : new MappedItemRenderer<>(true, myFun.andThen(v -> ReactfxUtil.mapPreserveConst(v, escapeFun)));
+        }
+
+
+        static <T> MappedItemRenderer<T> mapping(boolean ignoreEscape, Function<? super T, ? extends Val<String>> fun) {
+            return mappingObs(ignoreEscape, tObs -> Val.flatMap(tObs, fun));
+        }
+
+
+        static <T> MappedItemRenderer<T> mappingObs(boolean ignoreEscape, Function<? super ObservableValue<? extends T>, ? extends Val<String>> fun) {
+            return new MappedItemRenderer<>(ignoreEscape, (ctx, tObs) -> fun.apply(tObs));
         }
 
     }

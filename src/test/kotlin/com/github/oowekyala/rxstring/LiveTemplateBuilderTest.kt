@@ -384,4 +384,71 @@ class LiveTemplateBuilderTest : FunSpec({
 
     }
 
+
+    test("Test wrapped renderer") {
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+        }
+
+        val lt = LiveTemplate
+                .newBuilder<DContext>()
+                .append("<top>").endLine()
+                .bind({ it.name }, surrounded("|", "|\n", wrapped(6, false, asString())))
+                .append("</top>")
+                .toBoundTemplate(DContext())
+
+
+        lt.value shouldBe """
+            <top>
+            |top|
+            </top>
+        """.trimIndent()
+
+        lt.dataContext.name.value = null
+        lt.value shouldBe """
+            <top>
+            </top>
+        """.trimIndent()
+
+        lt.dataContext.name.value = "ffffffffffff" // 12
+        lt.value shouldBe """
+            <top>
+            |ffffff
+            ffffff|
+            </top>
+        """.trimIndent()
+
+    }
+
+
+    test("Test wrapped renderer preserve words") {
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+        }
+
+        val lt = LiveTemplate
+                .newBuilder<DContext>()
+                .append("<top>").endLine()
+                .bind({ it.name }, surrounded("|", "|\n", wrapped(6, true, asString())))
+                .append("</top>")
+                .toBoundTemplate(DContext())
+
+        lt.dataContext.name.value = "I am unable to see the contents of the Image AST Attribute and do regexp on it in XPath rules" // 12
+        lt.value shouldBe """
+            <top>
+            |I am unable
+            to see the
+            contents
+            of the Image
+            AST Attribute
+            and do regexp
+            on it in
+            XPath rules|
+            </top>
+        """.trimIndent()
+
+    }
+
 })
