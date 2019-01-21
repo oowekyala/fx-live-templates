@@ -307,22 +307,6 @@ class LiveTemplateBuilderTest : FunSpec({
 
     }
 
-    test("Test null string constants are pruned") {
-
-        class DContext {
-            val nums = FXCollections.observableArrayList(10, 15)
-        }
-
-        val lt =
-                LiveTemplate.newBuilder<DContext>()
-                        .append("<top nums='").bindSeq({ it.nums }) { null }.append("'/>")
-                        .toBoundTemplate(DContext())
-
-        (lt as LiveTemplateImpl).totalSubscriptions().value shouldBe 2L
-
-    }
-
-
 
 
     test("Test surrounded renderer bind") {

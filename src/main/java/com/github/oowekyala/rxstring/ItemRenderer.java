@@ -12,9 +12,6 @@ import javafx.beans.value.ObservableValue;
 /**
  * A type used to render objects of type T in a template.
  *
- * TODO make item renderers config-sensitive
- * TODO add indented() item renderer
- *
  * @param <T> Type of values to map
  */
 public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<?>, ObservableValue<? extends T>, Val<String>> {
@@ -124,8 +121,8 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
 
 
         /** Constructor for a renderer that doesn't use the builder config. */
-        private MappedItemRenderer(boolean ignoreEscape, Function<? super T, ? extends Val<String>> myFun) {
-            this(ignoreEscape, (ctx, t) -> myFun.apply(t));
+        private MappedItemRenderer(boolean ignoreEscape, Function<? super T, ? extends Val<String>> fun) {
+            this(ignoreEscape, (ctx, t) -> fun.apply(t));
         }
 
 

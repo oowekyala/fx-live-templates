@@ -43,9 +43,9 @@ interface BindingExtractor<D> {
             subTemplate.importConfigFrom(parent);
             // add a replace handler to the bound value of the child
 
-            subTemplate.addInternalReplaceHandler(valIdx::replaceRelative);
+            Subscription removeHandler = subTemplate.addInternalReplaceHandler(valIdx::replaceRelative);
 
-            return templateRebindSub(parent, subTemplate, valIdx);
+            return templateRebindSub(parent, subTemplate, valIdx).and(removeHandler);
         } else {
 
             return valRebindSub(parent, val, valIdx);

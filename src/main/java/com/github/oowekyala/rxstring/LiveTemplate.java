@@ -45,7 +45,7 @@ public interface LiveTemplate<D> extends Val<String> {
      * <p>When setting the data context to a non-null value, the {@linkplain #getValue() value}
      * of this Val passes from its previous state to the full text bound to the new data context.
      * When setting the data context to a null value, the value goes directly to null. If the value
-     * was already null, no changed is recorder. This is illustrated by the following schema:
+     * was already null, no change is recorded. That is illustrated by the following schema:
      * <pre>
      * data context:  ---null  d1--------------...--d1  d2--------d2   null  null
      * value:         ---null  text(d1)--------...--|   text(d2)--|    null------
@@ -84,14 +84,16 @@ public interface LiveTemplate<D> extends Val<String> {
      * <ul>
      * <li>When being added, and if the template is bound, to insert the current
      * value of the text. Parameters are (0, 0, {@link #getValue()}). If the template
-     * is not bound the handler is not called</li>
+     * is not bound the handler is not called.</li>
      * <li>When switching data contexts:
      * <ul>
      * <li>If the new data context is null, parameters are (0, text.length, ""),
      * which corresponds to a deletion of the whole text</li>
-     * <li>If the new data context is non-null, the handler is called with the
-     * parameters (0, prevText.length(), newText.length()), or (0,0, newText.length())
-     * if the previous data context was null.</li>
+     * <li>If the new data context is non-null and the previous data context was null,
+     * the handler is called with the parameters (0,0, newText.length()), which corresponds
+     * to an insertion of the whole text.</li>
+     * <li>If both the old and new data contexts are non-null, then the handlers are called
+     * only for the segments of text that have changed.</li>
      * </ul>
      * </li>
      * <li>When a change in the bound properties causes a change in the value
@@ -151,6 +153,15 @@ public interface LiveTemplate<D> extends Val<String> {
     default boolean isUseDiffMatchPatchStrategy() {
         return isUseDiffMatchPatchStrategyProperty().getValue();
     }
+
+
+    /**
+     * Creates a new live template identical to this one. The returned
+     * template is not bound to a data context.
+     *
+     * @return A copy of this template
+     */
+    LiveTemplate<D> copy();
 
 
     /**

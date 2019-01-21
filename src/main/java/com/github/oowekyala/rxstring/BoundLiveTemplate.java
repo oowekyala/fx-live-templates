@@ -72,7 +72,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     BoundLiveTemplate(D dataContext,
                       LiveTemplate<D> parent,
                       List<BindingExtractor<D>> bindings,
-                      List<ReplaceHandler> userReplaceHandler,
+                      List<ReplaceHandler> userReplaceHandlers,
                       Var<ReplaceHandler> parentReplaceCallback) {
 
         Objects.requireNonNull(dataContext);
@@ -87,7 +87,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         this.myBindings = bindings;
 
         this.myStringBuffer = new StringBuffer();
-        this.myReplaceHandlers = new Handlers(userReplaceHandler, parentReplaceCallback);
+        this.myReplaceHandlers = new Handlers(userReplaceHandlers, parentReplaceCallback);
 
         bindTo(dataContext, false);
         this.isPushInvalidations = true;
@@ -116,6 +116,11 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     }
 
 
+    /**
+     * Rebinds this bound template to a new data context.
+     *
+     * @param dataContext New data context
+     */
     void rebind(D dataContext) {
         bindTo(dataContext, true);
     }
@@ -173,6 +178,9 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     }
 
 
+    /**
+     * The main function that replaces text and notifies listeners. It's a {@link ReplaceHandler}.
+     */
     private void handleContentChange(int start, int end, String value) {
         if (start == end && value.isEmpty()) {
             // don't fire an event for nothing
@@ -265,14 +273,13 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
     private static class Handlers {
 
-        private final List<ReplaceHandler> myUserHandler;
+        private final List<ReplaceHandler> myUserHandlers;
         private final Var<ReplaceHandler> myParentCallback;
 
 
-        Handlers(List<ReplaceHandler> myUserHandler,
-                 Var<ReplaceHandler> myInternalReplaceHandlers) {
-            this.myUserHandler = myUserHandler;
-            this.myParentCallback = myInternalReplaceHandlers;
+        Handlers(List<ReplaceHandler> userHandlers, Var<ReplaceHandler> parentHandler) {
+            this.myUserHandlers = userHandlers;
+            this.myParentCallback = parentHandler;
         }
 
 
@@ -285,7 +292,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         private void notifyListenersOfReplace(ReplacementStrategy strategy) {
             myParentCallback.ifPresent(h -> strategy.apply(h, false));
             if (myParentCallback.isEmpty()) {
-                myUserHandler.forEach(h -> strategy.apply(h, true));
+                myUserHandlers.forEach(h -> strategy.apply(h, true));
             }
         }
 

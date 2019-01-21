@@ -37,13 +37,17 @@ final class ReactfxUtil {
 
     // this breaks laziness
     public static <T, R> Val<R> mapPreserveConst(Val<? extends T> val, Function<? super T, ? extends R> f) {
-        return isConst(val) ? Val.constant(f.apply(val.getValue())) : val.map(f);
+        return !isConst(val) ? val.map(f)
+                             : val.getValue() == null ? Val.constant(null)
+                                                      : Val.constant(f.apply(val.getValue()));
     }
 
 
     public static <T, R> Val<R> flatMapPreserveConst(ObservableValue<T> val,
                                                      Function<? super T, ? extends ObservableValue<R>> f) {
-        return isConst(val) ? Val.constant(f.apply(val.getValue()).getValue()) : Val.flatMap(val, f);
+        return !isConst(val) ? Val.flatMap(val, f)
+                             : val.getValue() == null ? Val.constant(null)
+                                                      : Val.constant(f.apply(val.getValue()).getValue());
     }
 
 
@@ -135,6 +139,20 @@ final class ReactfxUtil {
     }
 
 
+    /**
+     * Dynamically subscribes to elements of the list. When a replacement change is caught,
+     * deleted items are matched onto a corresponding added item. If a match is found, {@link RebindSubscription#rebind(Object)}
+     * is called, which allows recombining the new item with the old item. If a deleted item
+     * has no matching added element, then {@link RebindSubscription#unsubscribe()} is called.
+     * This method returns itself a {@link RebindSubscription} that can rebind all existing items
+     * on new items, using the method described above.
+     *
+     * @param elems Collection to observe
+     * @param f     Producer of rebind subscriptions for individual elements
+     * @param <T>   Type of elements
+     *
+     * @return A rebind subscription for the whole list
+     */
     static <T> RebindSubscription<ObservableList<T>> dynamicRecombine(ObservableList<? extends T> elems,
                                                                       // prev elt or null, new elt, index -> sub
                                                                       BiFunction<? super T, Integer, ? extends RebindSubscription<T>> f) {
@@ -186,6 +204,7 @@ final class ReactfxUtil {
     }
 
 
+    // helper for dynamicRecombine
     private static <T> RebindSubscription<ObservableList<T>> rebindSub(List<RebindSubscription<T>> elemSubs,
                                                                        BiFunction<? super T, Integer, ? extends RebindSubscription<T>> f,
                                                                        Subscription lstSub) {

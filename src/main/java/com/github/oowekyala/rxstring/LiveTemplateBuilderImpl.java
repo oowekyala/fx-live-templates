@@ -100,6 +100,11 @@ final class LiveTemplateBuilderImpl<D> implements LiveTemplateBuilder<D> {
     }
 
 
+    static <D> LiveTemplateBuilder<D> newBuilder(List<BindingExtractor<D>> bindings) {
+        return new LiveTemplateBuilderImpl<>(new ArrayList<>(bindings), new InheritableConfig());
+    }
+
+
     private static class InheritableConfig {
         String defaultIndent = "    ";
         Function<String, String> escapeFun = Function.identity();

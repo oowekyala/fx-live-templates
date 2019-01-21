@@ -1,6 +1,7 @@
 package com.github.oowekyala.rxstring;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -19,7 +20,7 @@ import org.reactfx.value.Var;
  * @author Clément Fournier
  * @since 1.0
  */
-class LiveTemplateImpl<D> implements LiveTemplate<D> {
+final class LiveTemplateImpl<D> implements LiveTemplate<D> {
 
     private final Var<D> myDataContext = Var.newSimpleVar(null);
     private final Var<BoundLiveTemplate<D>> myCurBound = Var.newSimpleVar(null);
@@ -29,16 +30,18 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
     private final Var<ReplaceHandler> myInternalReplaceHandlers = Var.newSimpleVar(null);
     private final List<ReplaceHandler> myUserReplaceHandlers = new ArrayList<>();
     private final Var<Boolean> useDiffMatchPatch = Var.newSimpleVar(true);
+    private final List<BindingExtractor<D>> myDataBindings;
 
 
     LiveTemplateImpl(List<BindingExtractor<D>> dataBinder) {
+        this.myDataBindings = Collections.unmodifiableList(dataBinder);
 
         myDataContext.values().subscribe(newCtx -> {
 
             if (myCurBound.isPresent() && newCtx != null) {
                 myCurBound.getValue().rebind(newCtx);
             } else if (newCtx != null) {
-                myCurBound.setValue(new BoundLiveTemplate<>(newCtx, this, dataBinder, myUserReplaceHandlers, myInternalReplaceHandlers));
+                myCurBound.setValue(new BoundLiveTemplate<>(newCtx, this, myDataBindings, myUserReplaceHandlers, myInternalReplaceHandlers));
             } else {
                 myCurBound.ifPresent(BoundLiveTemplate::unbind);
                 myCurBound.setValue(null);
@@ -51,8 +54,7 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
 
     Subscription addInternalReplaceHandler(ReplaceHandler handler) {
         myInternalReplaceHandlers.setValue(handler);
-        return Subscription.EMPTY;//FIXME
-        //                return () -> myInternalReplaceHandlers.remove(handler);
+        return () -> myInternalReplaceHandlers.setValue(null);
     }
 
 
@@ -61,10 +63,6 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
         D newCtx = (D) other.getDataContext();
         this.dataContextProperty().unbind();
         this.setDataContext(newCtx);
-        //        if (myCurBound.isPresent() && newCtx != null) {
-        //            myCurBound.getValue().rebind(newCtx, new Handlers(myUserReplaceHandlers, myInternalReplaceHandlers));
-        //        }
-        // the bindings of the this template to its current data context are unsubscribed
     }
 
 
@@ -118,6 +116,14 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
      */
     void importConfigFrom(LiveTemplate<?> liveTemplate) {
         this.setUseDiffMatchPatchStrategy(liveTemplate.isUseDiffMatchPatchStrategy());
+    }
+
+
+    @Override
+    public LiveTemplate<D> copy() {
+        LiveTemplateImpl<D> copy = (LiveTemplateImpl<D>) LiveTemplateBuilderImpl.newBuilder(myDataBindings).toTemplate();
+        copy.importConfigFrom(this);
+        return copy;
     }
 
 
