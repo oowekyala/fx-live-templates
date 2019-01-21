@@ -61,6 +61,19 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
 
 
     /**
+     * A value renderer that maps Ts to an observable string using the provided asString.
+     * This is the most general way to create a value renderer.
+     *
+     * @param fun          Mapper from T to String
+     * @param ignoreEscape If true, the value of this renderer won't be escaped by {@link LiveTemplateBuilder#withDefaultEscape(Function)}.
+     * @param <T>          Type of values this renderer can handle
+     */
+    public static <T> ItemRenderer<T> mappingObservable(Function<? super T, ? extends ObservableValue<String>> fun, boolean ignoreEscape) {
+        return new MappedItemRenderer<>(ignoreEscape, fun.andThen(Val::wrap));
+    }
+
+
+    /**
      * Returns a renderer that surrounds its item with the given prefix and suffix. The given
      * renderer is used to display the item. When the item is absent, the prefix and suffix are absent
      * too.
@@ -73,7 +86,7 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
      * @return A new renderer
      */
     public static <T> ItemRenderer<T> surrounded(String prefix, String suffix, ItemRenderer<T> renderer) {
-        return templated(b -> b.append(prefix).render(Function.identity(), renderer).append(suffix));
+        return templatedWrapper(renderer, b -> b.append(prefix), b -> b.append(suffix));
     }
 
 
@@ -91,20 +104,7 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
      * @return A new renderer
      */
     public static <T> ItemRenderer<T> indented(int indentLevel, ItemRenderer<T> renderer) {
-        return templated(b -> b.appendIndent(indentLevel).render(Function.identity(), renderer));
-    }
-
-
-    /**
-     * A value renderer that maps Ts to an observable string using the provided asString.
-     * This is the most general way to create a value renderer.
-     *
-     * @param fun          Mapper from T to String
-     * @param ignoreEscape If true, the value of this renderer won't be escaped by {@link LiveTemplateBuilder#withDefaultEscape(Function)}.
-     * @param <T>          Type of values this renderer can handle
-     */
-    public static <T> ItemRenderer<T> mappingObservable(Function<? super T, ? extends ObservableValue<String>> fun, boolean ignoreEscape) {
-        return new MappedItemRenderer<>(ignoreEscape, fun.andThen(Val::wrap));
+        return templatedWrapper(renderer, b -> b.appendIndent(indentLevel), b -> {});
     }
 
 
@@ -121,6 +121,27 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
      */
     public static <T> ItemRenderer<T> templated(Consumer<LiveTemplateBuilder<T>> subTemplateBuilder) {
         return new TemplatedItemRenderer<>(subTemplateBuilder);
+    }
+
+
+    /**
+     * Produces a templated render composed with a base renderer and some additional specs. If the
+     * base renderer is also a templated renderer, its spec is merged with the others so that nesting
+     * is avoided. E.g. {@code indented(1, surrounded("[", "]", templated(b->b.append("f")))} produces a single
+     * nested template and not 3.
+     */
+    private static <T> ItemRenderer<T> templatedWrapper(ItemRenderer<T> base, Consumer<LiveTemplateBuilder<T>> before, Consumer<LiveTemplateBuilder<T>> after) {
+        return new TemplatedItemRenderer<>(b -> {
+            before.accept(b);
+
+            if (base instanceof TemplatedItemRenderer) {
+                ((TemplatedItemRenderer<T>) base).subTemplateBuilderSpec.accept(b);
+            } else {
+                b.render(Function.identity(), base);
+            }
+
+            after.accept(b);
+        });
     }
 
 
