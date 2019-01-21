@@ -43,7 +43,7 @@ final class ReactfxUtil {
 
     public static <T, R> Val<R> flatMapPreserveConst(ObservableValue<T> val,
                                                      Function<? super T, ? extends ObservableValue<R>> f) {
-        return isConst(val) ? Val.constant(f.apply(val.getValue()).getValue()) : Val.flatMap(val,f);
+        return isConst(val) ? Val.constant(f.apply(val.getValue()).getValue()) : Val.flatMap(val, f);
     }
 
 
@@ -237,6 +237,13 @@ final class ReactfxUtil {
     }
 
 
+    /**
+     * A subscription that has two ways of unsubscribing: one giving a chance
+     * to replace an existing underlying data source (rebind), and one deleting
+     * completely.
+     *
+     * @param <D> Type of data source
+     */
     interface RebindSubscription<D> extends Subscription {
 
         RebindSubscription<D> rebind(D newItem);

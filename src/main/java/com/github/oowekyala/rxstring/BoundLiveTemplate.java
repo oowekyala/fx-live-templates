@@ -57,8 +57,8 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     private final boolean[] myConstantIndices;
     /** The bindings that specify this template. Used for rebinding. */
     private final List<BindingExtractor<D>> myBindings;
+    /** One subscription for each sequence. Rebound when rebinding the template. */
     private final List<RebindSubscription<ObservableList<Val<String>>>> mySequenceSubscriptions;
-    private final List<ObservableList<Val<String>>> myPrevSequences;
 
     private final StringBuffer myStringBuffer;
     private final EventSource<?> myInvalidations = new EventSource<>();
@@ -83,7 +83,6 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         this.myConstantIndices = new boolean[bindings.size()];
         this.mySequences = new ArrayList<>(Collections.nCopies(bindings.size(), null));
         this.mySequenceSubscriptions = new ArrayList<>(Collections.nCopies(bindings.size(), null));
-        this.myPrevSequences = new ArrayList<>(Collections.nCopies(bindings.size(), null));
         this.myBindings = bindings;
 
         this.myStringBuffer = new StringBuffer();
@@ -172,7 +171,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     }
 
 
-    private void handleContentChange(ValIdx valIdx, int start, int end, String value) {
+    private void handleContentChange(int start, int end, String value) {
         if (start == end && value.isEmpty()) {
             // don't fire an event for nothing
             return;
@@ -182,13 +181,11 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
         replacementStrategy.apply(myStringBuffer::replace, false);
 
-
         if (isPushInvalidations) {
             // propagate the change to the templates that contain this one
             myReplaceHandlers.notifyListenersOfReplace(replacementStrategy);
             myInvalidations.push(null);
         }
-        valIdx.propagateOffsetShift(value.length() - (end - start));
     }
 
 
@@ -232,23 +229,19 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         // this thing is captured which allows its indices to remain up to date
         ValIdx valIdx = insertBindingAt(outerIdx, innerIdx);
 
-        ReplaceHandler base = (start, end, value) -> handleContentChange(valIdx, start, end, value);
-        final ReplaceHandler relativeToVal = base.withOffset(valIdx::currentAbsoluteOffset);
-
-        return BindingExtractor.bindSingleVal(myParent, stringSource, valIdx, relativeToVal)
-                               .and(() -> deleteBindingAt(valIdx, relativeToVal));
+        return BindingExtractor.bindSingleVal(myParent, stringSource, valIdx).and(() -> deleteBindingAt(valIdx));
     }
 
 
-    private void deleteBindingAt(ValIdx idx, ReplaceHandler replaceHandler) {
+    private void deleteBindingAt(ValIdx idx) {
         if (isPushInvalidations) {
-            idx.delete(replaceHandler);
+            idx.delete();
         }
     }
 
 
     private ValIdx insertBindingAt(int outerIdx, int innerIdx) {
-        return new ValIdx(myOuterOffsets, myStringBuffer, outerIdx, innerIdx, mySequences.get(outerIdx));
+        return new ValIdx(myOuterOffsets, myStringBuffer, outerIdx, innerIdx, mySequences.get(outerIdx), this::handleContentChange);
     }
 
 
@@ -266,7 +259,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         }
     }
 
-    static class Handlers {
+    private static class Handlers {
 
         private final List<ReplaceHandler> myUserHandler;
         private final List<ReplaceHandler> myInternalReplaceHandlers;
@@ -290,9 +283,5 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
             myUserHandler.forEach(h -> strategy.apply(h, true));
         }
 
-
-        public Handlers freeze() {
-            return new Handlers(myUserHandler, new ArrayList<>(myInternalReplaceHandlers));
-        }
     }
 }

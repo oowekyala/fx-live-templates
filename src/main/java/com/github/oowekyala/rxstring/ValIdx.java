@@ -17,8 +17,9 @@ final class ValIdx implements Comparable<ValIdx> {
     private final int outerIdx;
     /** The enclosing sequence. */
     private final List<ValIdx> parent;
+    private final ReplaceHandler myParentReplaceHandler;
     /** Text offset relative to the start of the sequence. */
-    int relativeOffset;
+    private int relativeOffset;
     /** Index in the parent list. Shifted when elements are inserted to the left. */
     private int innerIdx;
     private int[] myOuterOffsets;
@@ -28,7 +29,8 @@ final class ValIdx implements Comparable<ValIdx> {
            StringBuffer stringBuffer,
            int outerIdx,
            int innerIdx,
-           List<ValIdx> parent) {
+           List<ValIdx> parent,
+           ReplaceHandler parentReplaceHandler) {
 
         this.stringBuffer = stringBuffer;
         this.outerIdx = outerIdx;
@@ -36,19 +38,20 @@ final class ValIdx implements Comparable<ValIdx> {
         this.parent = parent;
         this.myOuterOffsets = myOuterOffsets;
 
-        relativeOffset = innerIdx == 0 ? 0 : left().length() + left().relativeOffset;
+        this.relativeOffset = innerIdx == 0 ? 0 : left().relativeOffset + left().length();
+        this.myParentReplaceHandler = parentReplaceHandler.withOffset(this::currentAbsoluteOffset);
 
         // you can't call left().length() after setting this node in its parent
         parent.add(innerIdx, this);
         propagateItemShift(+1);
-        // The offset shift will be propagated via handleContentChange
+        // The offset shift will be propagated via replaceValue
         // when inserting the initial value, so not here
         // propagateOffsetShift(initialLength);
 
     }
 
 
-    int length() {
+    private int length() {
         if (innerIdx + 1 < parent.size()) {
             // there's a right node
             return right().relativeOffset - relativeOffset;
@@ -70,6 +73,36 @@ final class ValIdx implements Comparable<ValIdx> {
     }
 
 
+    /** Replaces all of this text range. */
+    void replaceValue(String value) {
+        replaceRelative(0, length(), value);
+    }
+
+
+    /**
+     * Replaces part of this text range.
+     */
+    void replaceRelative(int start, int end, String value) {
+        String safe = value == null ? "" : value;
+
+        myParentReplaceHandler.replace(start, end, safe);
+        propagateOffsetShift(safe.length() - (end - start));
+    }
+
+
+    /**
+     * Deletes this.
+     */
+    void delete() {
+        replaceValue("");
+
+        // propagate the shift before removing, otherwise we're
+        // missing the right sibling
+        propagateItemShift(-1);
+        parent.remove(innerIdx);
+    }
+
+
     private void propagateRight(Consumer<ValIdx> idxConsumer) {
         for (int j = innerIdx + 1; j < parent.size(); j++) {
             idxConsumer.accept(parent.get(j));
@@ -82,7 +115,7 @@ final class ValIdx implements Comparable<ValIdx> {
     }
 
 
-    void propagateOffsetShift(int shift) {
+    private void propagateOffsetShift(int shift) {
         if (shift == 0) {
             return;
         }
@@ -98,17 +131,7 @@ final class ValIdx implements Comparable<ValIdx> {
     }
 
 
-    void delete(ReplaceHandler handler) {
-        handler.replace(0, length(), "");
-
-        // propagate the shift before removing, otherwise we're
-        // missing the right sibling
-        propagateItemShift(-1);
-        parent.remove(innerIdx);
-    }
-
-
-    int currentAbsoluteOffset() {
+    private int currentAbsoluteOffset() {
         return myOuterOffsets[outerIdx] + relativeOffset;
     }
 

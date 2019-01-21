@@ -10,8 +10,6 @@ import org.reactfx.Subscription;
 import org.reactfx.value.Val;
 import org.reactfx.value.Var;
 
-import com.github.oowekyala.rxstring.BoundLiveTemplate.Handlers;
-
 
 /**
  * Implementation for {@link LiveTemplate}. Basically contains logic to switch
@@ -55,7 +53,7 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
         myInternalReplaceHandlers.clear();
         myInternalReplaceHandlers.add(handler);
         return Subscription.EMPTY;
-//                return () -> myInternalReplaceHandlers.remove(handler);
+        //                return () -> myInternalReplaceHandlers.remove(handler);
     }
 
 
@@ -64,9 +62,9 @@ class LiveTemplateImpl<D> implements LiveTemplate<D> {
         D newCtx = (D) other.getDataContext();
         this.dataContextProperty().unbind();
         this.setDataContext(newCtx);
-//        if (myCurBound.isPresent() && newCtx != null) {
-//            myCurBound.getValue().rebind(newCtx, new Handlers(myUserReplaceHandlers, myInternalReplaceHandlers));
-//        }
+        //        if (myCurBound.isPresent() && newCtx != null) {
+        //            myCurBound.getValue().rebind(newCtx, new Handlers(myUserReplaceHandlers, myInternalReplaceHandlers));
+        //        }
         // the bindings of the this template to its current data context are unsubscribed
     }
 
