@@ -451,4 +451,33 @@ class LiveTemplateBuilderTest : FunSpec({
 
     }
 
+    test("Test wrapped renderer indentation") {
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+        }
+
+        val lt = LiveTemplate
+                .newBuilder<DContext>().withDefaultIndent("|- ")
+                .append("<top>").endLine()
+                .bind({ it.name }, wrapped(6, 1, true, asString())).endLine()
+                .append("</top>")
+                .toBoundTemplate(DContext())
+
+        lt.dataContext.name.value = "I am unable to see the contents of the Image AST Attribute and do regexp on it in XPath rules" // 12
+        lt.value shouldBe """
+            <top>
+            |- I am unable
+            |- to see the
+            |- contents
+            |- of the Image
+            |- AST Attribute
+            |- and do regexp
+            |- on it in
+            |- XPath rules
+            </top>
+        """.trimIndent()
+
+    }
+
 })

@@ -97,7 +97,8 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
      * currently defined by the template builder to the rendering of the given item. This can be
      * useful if the indentation should only be displayed when the bound value is not-null. Using
      * {@link LiveTemplateBuilder#appendIndent(int)} appends it as a string constant and it will
-     * always be displayed.
+     * always be displayed. The indent is prepended only once, so if the renderer produces a multiline
+     * output the next lines will not be indented. FIXME
      *
      * @param indentLevel Number of times to repeat the indentation
      * @param renderer    Base renderer
@@ -140,40 +141,80 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
      * @return A value renderer for Ts
      */
     public static <T> ItemRenderer<T> wrapped(int wrapWidth, boolean preserveWords, ItemRenderer<T> wrapped) {
-        return new MappedItemRenderer<>(false, (ctx, t) -> Val.map(wrapped.apply(ctx, t), s -> wrapToWidth(s, wrapWidth, preserveWords)));
+        return wrapped(wrapWidth, 0, preserveWords, wrapped);
     }
 
 
-    private static String wrapToWidth(String toWrap, int width, boolean preserveWords) {
+    /**
+     * A value renderer that wraps the output of the given renderer to the specified text width.
+     * Doing this over a template will break the minimal change calculation. This includes the
+     * {@link #surrounded(String, String, ItemRenderer)} and {@link #indented(int, ItemRenderer)}
+     * renderers because they're implemented as light subtemplates.
+     *
+     * @param wrapWidth     Max width of the text
+     * @param indentLevel   Number of times to insert the builder's local default indentation style
+     *                      at the beginning of each line
+     * @param preserveWords Whether to avoid cutting through words
+     * @param wrapped       Renderer that's supposed to wrap the text
+     * @param <T>           Type of values to render
+     *
+     * @return A value renderer for Ts
+     */
+    public static <T> ItemRenderer<T> wrapped(int wrapWidth, int indentLevel, boolean preserveWords, ItemRenderer<T> wrapped) {
+        return new MappedItemRenderer<>(false, (ctx, t) -> Val.map(wrapped.apply(ctx, t), s -> wrapToWidth(s, ctx.getDefaultIndent(), indentLevel, wrapWidth, preserveWords)));
+    }
+
+
+    private static String wrapToWidth(String toWrap,
+                                      String indentStyle,
+                                      int indentLevel,
+                                      int width,
+                                      boolean preserveWords) {
         if (toWrap.length() < width) {
             return toWrap;
         }
 
         StringBuilder builder = new StringBuilder(toWrap);
         int offset = width;
+        // accumulates the offset difference between the builder and toWrap
+        int builderShift = repeat(builder, 0, indentStyle, indentLevel);
         while (offset < toWrap.length()) {
-            while (preserveWords && offset < toWrap.length() && !isWhitespace(builder.charAt(offset))) {
+            while (preserveWords && offset < toWrap.length() && !isWhitespace(toWrap.charAt(offset))) {
                 offset++;
             }
 
             int cut = offset;
 
-            while (preserveWords && offset < toWrap.length() && isWhitespace(builder.charAt(offset))) {
+            while (preserveWords && offset < toWrap.length() && isWhitespace(toWrap.charAt(offset))) {
                 offset++;
             }
 
-            int wsEnd = offset;
+            int wsLen = offset - cut;
             if (offset >= toWrap.length()) {
                 break; // text ends in ws
             }
-            builder.insert(cut, "\n");
-            if (wsEnd - cut > 0) {
-                builder.replace(cut + 1, wsEnd + 1, "");
-            }
-            offset = wsEnd + 1 + width;
+            builder.insert(builderShift + cut, "\n"); // insert a newline at cut point
+            int afterCut = builderShift + cut + 1;
+            // if there is whitespace space after the cut, delete it
+            builder.replace(afterCut, afterCut + wsLen, "");
+
+            // insert indent right after the cut
+            builderShift += repeat(builder, afterCut, indentStyle, indentLevel);
+
+            offset = cut + wsLen + 1 + width; // go to next line end in base string
         }
 
         return builder.toString();
+    }
+
+
+    private static int repeat(StringBuilder buffer, int fromOffset, String toRepeat, int times) {
+        int insertedLen = 0;
+        while (times-- > 0) {
+            buffer.insert(fromOffset, toRepeat);
+            insertedLen += toRepeat.length();
+        }
+        return insertedLen;
     }
 
 
