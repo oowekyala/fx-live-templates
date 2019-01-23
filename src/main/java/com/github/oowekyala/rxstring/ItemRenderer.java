@@ -129,9 +129,7 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
 
     /**
      * A value renderer that wraps the output of the given renderer to the specified text width.
-     * Doing this over a template will break the minimal change calculation. This includes the
-     * {@link #surrounded(String, String, ItemRenderer)} and {@link #indented(int, ItemRenderer)}
-     * renderers because they're implemented as light subtemplates.
+     * Same as {@link #wrapped(int, int, boolean, ItemRenderer)} but doesn't insert an indent.
      *
      * @param wrapWidth     Max width of the text
      * @param preserveWords Whether to avoid cutting through words
@@ -147,13 +145,14 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
 
     /**
      * A value renderer that wraps the output of the given renderer to the specified text width.
+     * A newline (\n) will be inserted, and possibly the local indent if the indent level is non-zero.
      * Doing this over a template will break the minimal change calculation. This includes the
      * {@link #surrounded(String, String, ItemRenderer)} and {@link #indented(int, ItemRenderer)}
      * renderers because they're implemented as light subtemplates.
      *
      * @param wrapWidth     Max width of the text
      * @param indentLevel   Number of times to insert the builder's local default indentation style
-     *                      at the beginning of each line
+     *                      at the beginning of each wrapped line.
      * @param preserveWords Whether to avoid cutting through words
      * @param wrapped       Renderer that's supposed to wrap the text
      * @param <T>           Type of values to render
@@ -163,6 +162,12 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
     public static <T> ItemRenderer<T> wrapped(int wrapWidth, int indentLevel, boolean preserveWords, ItemRenderer<T> wrapped) {
         return new MappedItemRenderer<>(false, (ctx, t) -> Val.map(wrapped.apply(ctx, t), s -> wrapToWidth(s, ctx.getDefaultIndent(), indentLevel, wrapWidth, preserveWords)));
     }
+
+    // TODO handle multiline content
+    // if string, then use the wrapToWidth algorithm
+    // if template, then forward the indentation to the builder
+    // when binding a subtemplate, the parent replace handler should filter line breaks
+    // and insert the relevant indent right after them
 
 
     private static String wrapToWidth(String toWrap,

@@ -479,5 +479,4 @@ class LiveTemplateBuilderTest : FunSpec({
         """.trimIndent()
 
     }
-
 })

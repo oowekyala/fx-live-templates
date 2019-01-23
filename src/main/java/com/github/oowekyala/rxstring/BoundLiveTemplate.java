@@ -66,7 +66,12 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     private final Handlers myReplaceHandlers;
     /** The template that spawned this bound template. */
     private final LiveTemplate<D> myParent;
+    /**
+     * Whether to push invalidations to the parent template.
+     * False while initializing and destroying.
+     */
     private boolean isPushInvalidations;
+    private String myIndent = ">";
 
 
     BoundLiveTemplate(D dataContext,
@@ -194,6 +199,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         if (isPushInvalidations) {
             // propagate the change to the templates that contain this one
             myReplaceHandlers.notifyListenersOfReplace(replacementStrategy);
+            // invalidate the value of this Val, reflected on the parent LiveTemplate
             myInvalidations.push(null);
         }
     }
@@ -245,6 +251,11 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     }
 
 
+    private ValIdx insertBindingAt(int outerIdx, int innerIdx) {
+        return new ValIdx(myOuterOffsets, myStringBuffer, outerIdx, innerIdx, mySequences.get(outerIdx), this::handleContentChange);
+    }
+
+
     private void deleteBindingAt(ValIdx idx) {
         if (isPushInvalidations) {
             idx.delete();
@@ -252,11 +263,10 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
     }
 
 
-    private ValIdx insertBindingAt(int outerIdx, int innerIdx) {
-        return new ValIdx(myOuterOffsets, myStringBuffer, outerIdx, innerIdx, mySequences.get(outerIdx), this::handleContentChange);
-    }
-
-
+    /**
+     * An object that encapsulates a set of patches to forward to a renderer.
+     * Using a diff-match-patch strategy may forward several patches.
+     */
     @FunctionalInterface
     private interface ReplacementStrategy {
         /**
@@ -266,6 +276,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
         void apply(ReplaceHandler handler, boolean logExceptionsButDontFail);
 
 
+        /** Simple single-patch strategy. */
         static ReplacementStrategy replacing(int start, int end, String value) {
             return (handler, canFail) -> handler.unfailing(canFail).replace(start, end, value);
         }

@@ -26,7 +26,6 @@ interface BindingExtractor<D> {
      * Text deletion should not be handled in this subscription, it's handled upstream. The subscription
      * is just supposed to stop observing the val and not cleanup.
      */
-    // on pourrait dispatcher mais ballec
     static RebindSubscription<Val<String>> bindSingleVal(LiveTemplate<?> parent,
                                                          Val<String> val,
                                                          ValIdx valIdx) {

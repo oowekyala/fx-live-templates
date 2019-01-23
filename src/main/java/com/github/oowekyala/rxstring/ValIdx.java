@@ -17,11 +17,13 @@ final class ValIdx implements Comparable<ValIdx> {
     private final int outerIdx;
     /** The enclosing sequence. */
     private final List<ValIdx> parent;
+    /** Replace handler for the parent template. */
     private final ReplaceHandler myParentReplaceHandler;
     /** Text offset relative to the start of the sequence. */
     private int relativeOffset;
     /** Index in the parent list. Shifted when elements are inserted to the left. */
     private int innerIdx;
+    /** Outer offsets of the parent bound template. */
     private int[] myOuterOffsets;
 
 
@@ -80,7 +82,7 @@ final class ValIdx implements Comparable<ValIdx> {
 
 
     /**
-     * Replaces part of this text range.
+     * Replaces part of the text range of this valid.
      */
     void replaceRelative(int start, int end, String value) {
         String safe = value == null ? "" : value;
