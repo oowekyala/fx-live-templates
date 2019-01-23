@@ -20,31 +20,35 @@ import javafx.collections.ObservableList;
 
 
 /**
+ * Some utilities that extend the functionality of ReactFX. <b>This is internal API.</b> It's exposed
+ * here for convenience but we make <b>no guarantee of compatibility</b> from version to version. Some
+ * of those are proposed to be merged in the main codebase.
+ *
  * @author Clément Fournier
  * @since 1.0
  */
-final class ReactfxUtil {
+public final class ReactfxExtensions {
 
-    private ReactfxUtil() {
+    private ReactfxExtensions() {
 
     }
 
 
-    public static boolean isConst(ObservableValue<?> val) {
+    static boolean isConst(ObservableValue<?> val) {
         return val instanceof RigidObservable;
     }
 
 
     // this breaks laziness
-    public static <T, R> Val<R> mapPreserveConst(Val<? extends T> val, Function<? super T, ? extends R> f) {
+    static <T, R> Val<R> mapPreserveConst(Val<? extends T> val, Function<? super T, ? extends R> f) {
         return !isConst(val) ? val.map(f)
                              : val.getValue() == null ? Val.constant(null)
                                                       : Val.constant(f.apply(val.getValue()));
     }
 
 
-    public static <T, R> Val<R> flatMapPreserveConst(ObservableValue<T> val,
-                                                     Function<? super T, ? extends ObservableValue<R>> f) {
+    static <T, R> Val<R> flatMapPreserveConst(ObservableValue<T> val,
+                                              Function<? super T, ? extends ObservableValue<R>> f) {
         return !isConst(val) ? Val.flatMap(val, f)
                              : val.getValue() == null ? Val.constant(null)
                                                       : Val.constant(f.apply(val.getValue()).getValue());
@@ -60,7 +64,7 @@ final class ReactfxUtil {
      * @param <E>    Source elt type
      * @param <F>    Target elt type
      */
-    public static <E, F> List<F> lazyMappedView(List<? extends E> source, Function<? super E, ? extends F> f) {
+    static <E, F> List<F> lazyMappedView(List<? extends E> source, Function<? super E, ? extends F> f) {
         return new AbstractList<F>() {
 
             private Map<E, F> cache = new WeakHashMap<>();
@@ -96,9 +100,8 @@ final class ReactfxUtil {
      * subscriptions are unsubscribed as well, and no new elementary
      * subscriptions will be created.
      */
-    // Until ReactFX merges my PR
-    static <T> Subscription dynamic(ObservableList<? extends T> elems,
-                                    BiFunction<? super T, Integer, ? extends Subscription> f) {
+    public static <T> Subscription dynamic(ObservableList<? extends T> elems,
+                                           BiFunction<? super T, Integer, ? extends Subscription> f) {
 
         List<Subscription> elemSubs = new ArrayList<>(elems.size());
 
@@ -153,9 +156,9 @@ final class ReactfxUtil {
      *
      * @return A rebind subscription for the whole list
      */
-    static <T> RebindSubscription<ObservableList<T>> dynamicRecombine(ObservableList<? extends T> elems,
-                                                                      // prev elt or null, new elt, index -> sub
-                                                                      BiFunction<? super T, Integer, ? extends RebindSubscription<T>> f) {
+    public static <T> RebindSubscription<ObservableList<T>> dynamicRecombine(ObservableList<? extends T> elems,
+                                                                             // prev elt or null, new elt, index -> sub
+                                                                             BiFunction<? super T, Integer, ? extends RebindSubscription<T>> f) {
 
         List<RebindSubscription<T>> elemSubs = new ArrayList<>(elems.size());
 
@@ -251,8 +254,31 @@ final class ReactfxUtil {
      *
      * @throws NullPointerException If the source collection is null
      */
-    static <E> LiveList<E> flattenVals(ObservableList<? extends ObservableValue<? extends E>> source) {
+    public static <E> LiveList<E> flattenVals(ObservableList<? extends ObservableValue<? extends E>> source) {
         return new FlatValList<>(Objects.requireNonNull(source));
+    }
+
+
+    /**
+     * Returns a view on the original list that pretends its elements are separated by delimiters,
+     * and that the first and last are a special prefix and suffix. E.g. calling this method with
+     * parameters source: [A,B], prefix: p, suffix:s, delimiter:d will return a list view with the
+     * elements [p,A,d,B,s]. The empty list is mapped to [p,s], so the returned list view has never
+     * less than two elements. When elements are added or removed from the source list, events are
+     * fired for those events as well as for the possible modifications of delimiter position. E.g.
+     * if the source is empty and you add elements A and B, then the returned list will fire a list
+     * change adding the sublist [A,d,B].
+     *
+     * @param source    Source list view
+     * @param prefix    First element of the returned list view
+     * @param suffix    Last element of the returned list view
+     * @param delimiter Element inserted between any element of the source list
+     *
+     * @author Clément Fournier
+     * @since 1.0
+     */
+    public static <E> LiveList<E> asDelimited(ObservableList<? extends E> source, E prefix, E suffix, E delimiter) {
+        return new DelimitedListView<>(source, prefix, suffix, delimiter);
     }
 
 
@@ -263,7 +289,7 @@ final class ReactfxUtil {
      *
      * @param <D> Type of data source
      */
-    interface RebindSubscription<D> extends Subscription {
+    public interface RebindSubscription<D> extends Subscription {
 
         RebindSubscription<D> rebind(D newItem);
 

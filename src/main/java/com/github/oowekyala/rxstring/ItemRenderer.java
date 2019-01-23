@@ -213,7 +213,7 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
 
 
         public ItemRenderer<T> escapeWith(Function<String, String> escapeFun) {
-            return myNoEscape ? this : new MappedItemRenderer<>(true, myFun.andThen(v -> ReactfxUtil.mapPreserveConst(v, escapeFun)));
+            return myNoEscape ? this : new MappedItemRenderer<>(true, myFun.andThen(v -> ReactfxExtensions.mapPreserveConst(v, escapeFun)));
         }
 
 

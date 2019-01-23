@@ -11,6 +11,8 @@ import org.reactfx.collection.QuasiListChange;
 import org.reactfx.collection.QuasiListModification;
 import org.reactfx.collection.UnmodifiableByDefaultLiveList;
 
+import javafx.collections.ObservableList;
+
 
 /**
  * A list view that pretends its elements are separated by delimiters, and that the
@@ -22,13 +24,13 @@ import org.reactfx.collection.UnmodifiableByDefaultLiveList;
 class DelimitedListView<E> extends LiveListBase<E> implements UnmodifiableByDefaultLiveList<E> {
 
     private static final int UNINITIALIZED = -6;
-    private final LiveList<? extends E> source;
+    private final ObservableList<? extends E> source;
     private final E delimiter;
     private final E prefix;
     private final E suffix;
 
 
-    public DelimitedListView(LiveList<? extends E> source, E delimiter, E prefix, E suffix) {
+    DelimitedListView(ObservableList<? extends E> source, E delimiter, E prefix, E suffix) {
         this.source = source;
         this.delimiter = delimiter;
         this.prefix = prefix;
@@ -48,7 +50,7 @@ class DelimitedListView<E> extends LiveListBase<E> implements UnmodifiableByDefa
         QuasiListChange<? extends E> change) {
         return () -> {
             List<? extends QuasiListModification<? extends E>> mods = change.getModifications();
-            return ReactfxUtil.lazyMappedView(mods, mod -> new QuasiListModification<E>() {
+            return ReactfxExtensions.lazyMappedView(mods, mod -> new QuasiListModification<E>() {
 
                 private List<E> myRemoved;
                 private int myTo = UNINITIALIZED;

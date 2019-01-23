@@ -15,7 +15,7 @@ import org.reactfx.value.Val;
 import org.reactfx.value.ValBase;
 import org.reactfx.value.Var;
 
-import com.github.oowekyala.rxstring.ReactfxUtil.RebindSubscription;
+import com.github.oowekyala.rxstring.ReactfxExtensions.RebindSubscription;
 import com.github.oowekyala.rxstring.diff_match_patch.Patch;
 import javafx.collections.ObservableList;
 
@@ -206,7 +206,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
 
 
     private boolean isIgnorable(Val<String> val) {
-        return ReactfxUtil.isConst(val) && (val.isEmpty() || val.getValue().isEmpty());
+        return ReactfxExtensions.isConst(val) && (val.isEmpty() || val.getValue().isEmpty());
     }
 
 
@@ -234,7 +234,7 @@ final class BoundLiveTemplate<D> extends ValBase<String> {
             return mySequenceSubscriptions.get(outerIdx).rebind(lst);
         }
 
-        return ReactfxUtil.dynamicRecombine(lst, (elt, innerIdx) -> initVal(elt, outerIdx, innerIdx));
+        return ReactfxExtensions.dynamicRecombine(lst, (elt, innerIdx) -> initVal(elt, outerIdx, innerIdx));
     }
 
 

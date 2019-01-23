@@ -5,7 +5,7 @@ import org.reactfx.collection.LiveArrayList;
 import org.reactfx.collection.LiveList;
 import org.reactfx.value.Val;
 
-import com.github.oowekyala.rxstring.ReactfxUtil.RebindSubscription;
+import com.github.oowekyala.rxstring.ReactfxExtensions.RebindSubscription;
 
 
 /**

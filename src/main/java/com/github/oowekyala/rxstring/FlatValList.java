@@ -17,7 +17,7 @@ import javafx.collections.ObservableList;
 /**
  * Wrapper around an ObservableList&lt;ObservableValue&lt;T&gt;&gt; that presents
  * the interface of a LiveList&lt;T&gt; and subscribes to the changes of its individual
- * elements. See {@link ReactfxUtil#flattenVals(ObservableList)}.
+ * elements. See {@link ReactfxExtensions#flattenVals(ObservableList)}.
  *
  * @author Clément Fournier
  */
@@ -50,8 +50,8 @@ class FlatValList<T> extends LiveListBase<T> implements UnmodifiableByDefaultLiv
 
         return Subscription.multi(
             LiveList.observeQuasiChanges(mapped, this::notifyObservers),
-            ReactfxUtil.dynamic(mySource,
-                                (element, i) -> Val.observeChanges(element,
+            ReactfxExtensions.dynamic(mySource,
+                                      (element, i) -> Val.observeChanges(element,
                                                                    (obs, oldV, newV) -> componentChanged(i, oldV, newV)))
         );
     }

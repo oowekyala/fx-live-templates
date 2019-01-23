@@ -41,7 +41,7 @@ public class SeqRenderer<T> implements BiFunction<LiveTemplateBuilder<?>, Observ
     private SeqRenderer<T> delimited(String prefix, String suffix, String delim) {
         return new SeqRenderer<>((ctx, obsList) -> {
             LiveList<Val<String>> base = this.apply(ctx, obsList);
-            return new DelimitedListView<>(base, Val.constant(delim), Val.constant(prefix), Val.constant(suffix));
+            return ReactfxExtensions.asDelimited(base, Val.constant(delim), Val.constant(prefix), Val.constant(suffix));
         });
     }
 
