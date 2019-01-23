@@ -274,6 +274,7 @@ public interface LiveTemplateBuilder<D> {
      * @see #render(Function, ItemRenderer)
      */
     default <T> LiveTemplateBuilder<D> bind(Function<? super D, ? extends ObservableValue<? extends T>> extractor, ItemRenderer<? super T> renderer) {
+        //noinspection Convert2MethodRef
         return bindSeq(extractor.andThen(obs -> new LiveArrayList<>(obs)).andThen(ReactfxUtil::flattenVals)::apply, renderer);
     }
 

@@ -1,6 +1,6 @@
 package com.github.oowekyala.rxstring;
 
-import static java.lang.Character.isWhitespace;
+import static com.github.oowekyala.rxstring.IndentHelper.wrapToWidth;
 
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -168,59 +168,6 @@ public abstract class ItemRenderer<T> implements BiFunction<LiveTemplateBuilder<
     // if template, then forward the indentation to the builder
     // when binding a subtemplate, the parent replace handler should filter line breaks
     // and insert the relevant indent right after them
-
-
-    private static String wrapToWidth(String toWrap,
-                                      String indentStyle,
-                                      int indentLevel,
-                                      int width,
-                                      boolean preserveWords) {
-        if (toWrap.length() < width) {
-            return toWrap;
-        }
-
-        StringBuilder builder = new StringBuilder(toWrap);
-        int offset = width;
-        // accumulates the offset difference between the builder and toWrap
-        int builderShift = repeat(builder, 0, indentStyle, indentLevel);
-        while (offset < toWrap.length()) {
-            while (preserveWords && offset < toWrap.length() && !isWhitespace(toWrap.charAt(offset))) {
-                offset++;
-            }
-
-            int cut = offset;
-
-            while (preserveWords && offset < toWrap.length() && isWhitespace(toWrap.charAt(offset))) {
-                offset++;
-            }
-
-            int wsLen = offset - cut;
-            if (offset >= toWrap.length()) {
-                break; // text ends in ws
-            }
-            builder.insert(builderShift + cut, "\n"); // insert a newline at cut point
-            int afterCut = builderShift + cut + 1;
-            // if there is whitespace space after the cut, delete it
-            builder.replace(afterCut, afterCut + wsLen, "");
-
-            // insert indent right after the cut
-            builderShift += repeat(builder, afterCut, indentStyle, indentLevel);
-
-            offset = cut + wsLen + 1 + width; // go to next line end in base string
-        }
-
-        return builder.toString();
-    }
-
-
-    private static int repeat(StringBuilder buffer, int fromOffset, String toRepeat, int times) {
-        int insertedLen = 0;
-        while (times-- > 0) {
-            buffer.insert(fromOffset, toRepeat);
-            insertedLen += toRepeat.length();
-        }
-        return insertedLen;
-    }
 
 
     /**

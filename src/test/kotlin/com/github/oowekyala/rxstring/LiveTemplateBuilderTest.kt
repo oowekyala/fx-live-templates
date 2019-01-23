@@ -479,4 +479,109 @@ class LiveTemplateBuilderTest : FunSpec({
         """.trimIndent()
 
     }
+
+    test("Test wrapped renderer indentation w/ double newline") {
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+        }
+
+        val lt = LiveTemplate
+                .newBuilder<DContext>().withDefaultIndent("|- ")
+                .append("<top>").endLine()
+                .bind({ it.name }, wrapped(6, 1, true, asString())).endLine()
+                .append("</top>")
+                .toBoundTemplate(DContext())
+
+        lt.dataContext.name.value =
+                    """
+                    I am unable to see the contents of the Image AST.
+
+                    Attribute and do regexp on it in XPath rules
+                    """.trimIndent()
+
+        lt.value shouldBe """
+            <top>
+            |- I am unable
+            |- to see the
+            |- contents
+            |- of the Image
+            |- AST.
+
+            |- Attribute
+            |- and do regexp
+            |- on it in
+            |- XPath rules
+            </top>
+        """.trimIndent()
+
+    }
+
+
+    test("Test wrapped renderer indentation w/ newline") {
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+        }
+
+        val lt = LiveTemplate
+                .newBuilder<DContext>().withDefaultIndent("|- ")
+                .append("<top>").endLine()
+                .bind({ it.name }, wrapped(6, 1, true, asString())).endLine()
+                .append("</top>")
+                .toBoundTemplate(DContext())
+
+        lt.dataContext.name.value =
+                """
+                    I am unable to see the contents of the Image AST
+                    Attribute and do regexp on it in XPath rules
+                    """.trimIndent()
+
+        lt.value shouldBe """
+            <top>
+            |- I am unable
+            |- to see the
+            |- contents
+            |- of the Image
+            |- AST Attribute
+            |- and do regexp
+            |- on it in
+            |- XPath rules
+            </top>
+        """.trimIndent()
+
+    }
+    test("Test wrapped renderer indentation w/ whitespace indent") {
+
+        class DContext {
+            val name = Var.newSimpleVar("top")
+        }
+
+        val lt = LiveTemplate
+                .newBuilder<DContext>().withDefaultIndent("  >")
+                .append("<top>").endLine()
+                .bind({ it.name }, wrapped(6, 1, true, asString())).endLine()
+                .append("</top>")
+                .toBoundTemplate(DContext())
+
+        lt.dataContext.name.value =
+                """
+                    I am unable to see the contents of the Image AST
+                    Attribute and do regexp on it in XPath rules
+                    """.trimIndent()
+
+        lt.value shouldBe """
+            <top>
+              >I am unable
+              >to see the
+              >contents
+              >of the Image
+              >AST Attribute
+              >and do regexp
+              >on it in
+              >XPath rules
+            </top>
+        """.trimIndent()
+
+    }
 })
