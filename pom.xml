@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.github.oowekyala</groupId>
     <artifactId>fx-live-templates</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>1.0</version>
 
     <name>JavaFX Live Templates</name>
     <description>A simple framework to present data as a string with data binding</description>
@@ -25,7 +24,7 @@
         <connection>scm:git:${github.repo}.git</connection>
         <url>${github.repo}</url>
         <developerConnection>scm:git:${github.repo}.git</developerConnection>
-        <tag>HEAD</tag>
+        <tag>releases/1.0</tag>
     </scm>
 
     <developers>
